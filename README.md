@@ -1,0 +1,1 @@
+Activity Insights BETA CLI
