@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	logFile := setLogFile("ps-time.logs")
+	logFile := setLogFile("ps-activity-insights.logs")
 	defer logFile.Close()
 
 	if len(os.Args) > 1 && os.Args[1] == "register" {
