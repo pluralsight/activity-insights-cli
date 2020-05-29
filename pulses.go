@@ -27,7 +27,7 @@ func getLanguage(fileName string) (string, error) {
 			if ext := filepath.Ext(fileName); ext == ".vsct" {
 				language = "XML"
 			} else {
-				language = "Unknown"
+				language = "Other"
 			}
 		}
 		fileLanguageMap[fileName] = language
