@@ -33,7 +33,7 @@ pub struct Pulse {
     #[serde(rename(serialize = "programmingLanguage"))]
     programming_language: String,
     editor: String,
-    tags: Vec<String>,
+    tags: HashSet<&'static str>,
 }
 
 /*
@@ -52,28 +52,23 @@ impl TryFrom<PulseFromEditor> for Pulse {
             .map(|detection| detection.language())
             .unwrap_or("Other");
 
-        let content = fs::read_to_string(&editor_pulse.file_path).unwrap_or(String::from(""));
-
-        let mut tokens: HashSet<String> = HashSet::new();
-
-        Tokenizer::new(&content)
+        let content = fs::read_to_string(&editor_pulse.file_path).unwrap_or_default();
+        let tags: HashSet<&'static str> = Tokenizer::new(&content)
             .tokens()
             .filter_map(|token| match token {
                 Token::String(_, value, _) | Token::Ident(value) => {
-                    PACKAGES.get_key(value).map(|v| v.to_string())
+                    PACKAGES.get_key(value).copied()
                 }
                 _ => None,
             })
-            .for_each(|token| {
-                tokens.insert(token);
-            });
+            .collect();
 
         Ok(Pulse {
             pulse_type: editor_pulse.event_type,
             date: timestamp.to_rfc3339(),
             editor: editor_pulse.editor,
             programming_language: String::from(language),
-            tags: tokens.into_iter().collect(),
+            tags,
         })
     }
 }
@@ -107,14 +102,10 @@ mod tests {
 
         let editor_pulse: PulseFromEditor =
             serde_json::from_str(content).expect("Failed deserializing editor pulse");
-        let mut pulse = Pulse::try_from(editor_pulse).expect("Error converting to pulse");
-        let tags = vec![
-            String::from("config"),
-            String::from("dirs"),
-            String::from("log"),
-            String::from("reqwest"),
-        ];
-        pulse.tags.sort();
+        let pulse = Pulse::try_from(editor_pulse).expect("Error converting to pulse");
+        let tags: HashSet<&'static str> = vec!["config", "dirs", "log", "reqwest"]
+            .into_iter()
+            .collect();
 
         let expected = Pulse {
             pulse_type: String::from("typing"),
