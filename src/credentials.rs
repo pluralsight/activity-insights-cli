@@ -105,9 +105,7 @@ impl Credentials {
 
     /*
      * new_api_token will create a new api token and add it to the struct but it will not udpate
-     * the credentials file on disk. This is so we can create an api token and open the browser
-     * before updating the api token to the credentials file. To update the credentials file, call
-     * update_api_token
+     * the credentials file on disk. To update the credentials file, call update_api_token
      */
     pub fn new_api_token(&mut self) -> Uuid {
         let uuid = Uuid::new_v4();

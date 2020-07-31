@@ -57,6 +57,7 @@ pub enum RequestError {
 
 const PULSE_API_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 
+#[cfg(not(test))]
 pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, RequestError> {
     let client = Client::new();
     let creds = Credentials::fetch()?;
@@ -71,6 +72,12 @@ pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, RequestError> {
         }
         None => Err(RequestError::ApiTokenError),
     }
+}
+
+// Don't actually send the pulses for the tests
+#[cfg(test)]
+pub fn send_pulses(_pulses: &Vec<Pulse>) -> Result<StatusCode, RequestError> {
+    Ok(StatusCode::default())
 }
 
 #[cfg(target_os = "macos")]
