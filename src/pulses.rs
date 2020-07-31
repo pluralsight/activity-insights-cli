@@ -33,7 +33,7 @@ pub struct Pulse {
     #[serde(rename(serialize = "programmingLanguage"))]
     programming_language: String,
     editor: String,
-    tokens: Vec<String>,
+    tags: Vec<String>,
 }
 
 /*
@@ -73,7 +73,7 @@ impl TryFrom<PulseFromEditor> for Pulse {
             date: timestamp.to_rfc3339(),
             editor: editor_pulse.editor,
             programming_language: String::from(language),
-            tokens: tokens.into_iter().collect(),
+            tags: tokens.into_iter().collect(),
         })
     }
 }
@@ -108,20 +108,20 @@ mod tests {
         let editor_pulse: PulseFromEditor =
             serde_json::from_str(content).expect("Failed deserializing editor pulse");
         let mut pulse = Pulse::try_from(editor_pulse).expect("Error converting to pulse");
-        let tokens = vec![
+        let tags = vec![
             String::from("config"),
             String::from("dirs"),
             String::from("log"),
             String::from("reqwest"),
         ];
-        pulse.tokens.sort();
+        pulse.tags.sort();
 
         let expected = Pulse {
             pulse_type: String::from("typing"),
             date: String::from("2020-07-27T16:48:33.238+00:00"),
             programming_language: String::from("Rust"),
             editor: String::from("emacs 😭"),
-            tokens,
+            tags,
         };
         assert_eq!(pulse, expected);
     }
