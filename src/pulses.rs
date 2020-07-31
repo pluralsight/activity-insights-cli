@@ -1,3 +1,7 @@
+// Include a phf set of common package names to match against
+// static PACKAGES: phf::Set<&'static str> = ...;
+include!("./codegen/packages-set.rs");
+
 use chrono::{TimeZone, Utc};
 use hyperpolyglot;
 use serde::{Deserialize, Serialize};
