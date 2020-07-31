@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::{convert::TryFrom, path::PathBuf};
+use thiserror::Error;
 
 /*
  * event_date is milliseconds seconds since the Unix epoch
@@ -36,19 +37,26 @@ pub struct Pulse {
     tags: HashSet<&'static str>,
 }
 
+#[derive(Debug, Error)]
+pub enum ConversionError {
+    #[error("File: {0} threw io error: {1}")]
+    IOError(PathBuf, std::io::Error),
+}
+
 /*
  * TryFrom will fail in the event of an io error but not if the programming language can't be
  * detected. If the programming language can't be detected, then "Other" will be the  value of
  * programming language
  */
 impl TryFrom<PulseFromEditor> for Pulse {
-    type Error = std::io::Error;
+    type Error = ConversionError;
 
     fn try_from(editor_pulse: PulseFromEditor) -> Result<Self, Self::Error> {
         let (seconds, nanosecs) = breakdown_milliseconds(editor_pulse.event_date);
         let timestamp = Utc.timestamp(seconds, nanosecs);
 
-        let language = hyperpolyglot::detect(&editor_pulse.file_path)?
+        let language = hyperpolyglot::detect(&editor_pulse.file_path)
+            .map_err(|e| ConversionError::IOError(editor_pulse.clone().file_path, e))?
             .map(|detection| detection.language())
             .unwrap_or("Other");
 

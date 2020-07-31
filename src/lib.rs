@@ -24,7 +24,7 @@ pub fn build_pulses(content: &str) -> Result<Vec<Pulse>, serde_json::error::Erro
         .filter_map(|event| match Pulse::try_from(event) {
             Ok(p) => Some(p),
             Err(e) => {
-                warn!("Couldn't convert event to a pulse: {:?}\n{}", content, e);
+                warn!("Couldn't convert event to a pulse: {}", e);
                 None
             }
         })
