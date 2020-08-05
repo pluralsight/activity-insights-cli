@@ -31,7 +31,10 @@ const BINARY_DISTRIBUTION: &'static str =
     "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/windows/ps-time.exe";
 
 const CLI_VERSION_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/version";
+#[cfg(unix)]
 const EXECUTABLE: &'static str = "activity-insights";
+#[cfg(not(unix))]
+const EXECUTABLE: &'static str = "activity-insights.exe";
 #[allow(dead_code)]
 const PULSE_API_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 const REGISTRATION_URL: &'static str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
