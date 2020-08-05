@@ -1,4 +1,4 @@
-use log::warn;
+use log::{info, warn};
 use reqwest::{
     blocking::{self, Client},
     StatusCode,
@@ -160,7 +160,7 @@ pub fn check_for_updates() -> Result<(), ActivityInsightsError> {
     let resp: VersionResponse = serde_json::from_reader(resp)?;
 
     if resp.version > VERSION {
-        log::info!("Updating cli to version {}...", resp.version);
+        info!("Updating cli to version {}...", resp.version);
         update_cli()
     } else {
         Ok(())

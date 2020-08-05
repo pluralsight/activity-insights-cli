@@ -80,6 +80,7 @@ fn create_logger() {
 }
 
 fn register_command() {
+    info!("Starting register command");
     if let Err(e) = register() {
         error!("Error on registration: {}", e);
         if let Err(e) = open_browser(BAD_REGISTRATION_URL) {
@@ -87,17 +88,23 @@ fn register_command() {
                 "Error trying to let the user know a registration went bad: {}",
                 e
             );
+        } else {
+            info!("Register successfully ran");
         }
     }
 }
 
 fn dashboard_command() {
+    info!("Starting dashboard command");
     if let Err(e) = open_browser(DASHBOARD_URL) {
         error!("Error trying to show the user their dashboard: {}", e);
+    } else {
+        info!("Dashboard successfully opened");
     }
 }
 
 fn pulse_command() {
+    info!("Starting pulse command");
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
         error!("Error reading from stdin: {}", e);
