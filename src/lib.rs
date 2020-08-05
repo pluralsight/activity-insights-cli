@@ -1,7 +1,8 @@
 use log::warn;
-#[allow(dead_code)]
-use reqwest::blocking::Client;
-use reqwest::{blocking, StatusCode};
+use reqwest::{
+    blocking::{self, Client},
+    StatusCode,
+};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
@@ -19,8 +20,16 @@ mod pulses;
 use credentials::{Credentials, CredentialsError};
 use pulses::{Pulse, PulseFromEditor};
 
+#[cfg(target_os = "linux")]
 const BINARY_DISTRIBUTION: &'static str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/";
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/linux/ps-time";
+#[cfg(target_os = "macos")]
+const BINARY_DISTRIBUTION: &'static str =
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/ps-time";
+#[cfg(target_os = "windows")]
+const BINARY_DISTRIBUTION: &'static str =
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/windows/ps-time.exe";
+
 const CLI_VERSION_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/version";
 const EXECUTABLE: &'static str = "activity-insights";
 #[allow(dead_code)]
@@ -153,7 +162,7 @@ pub fn check_for_updates() -> Result<(), UpdateError> {
     let resp: VersionResponse = serde_json::from_reader(resp)?;
 
     if resp.version > VERSION {
-        log::info!("Updating cli to version... {}", resp.version);
+        log::info!("Updating cli to version {}...", resp.version);
         update_cli()
     } else {
         Ok(())
