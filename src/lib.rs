@@ -1,13 +1,17 @@
 use log::warn;
-use reqwest::{blocking::Client, StatusCode};
-use serde::Serialize;
+#[allow(dead_code)]
+use reqwest::blocking::Client;
+use reqwest::{blocking, StatusCode};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
     convert::TryFrom,
-    io,
+    fs::{self, File},
+    io::{self, BufWriter, Write},
     process::{Child, Command},
 };
 use thiserror::Error;
+use uuid::Uuid;
 
 mod credentials;
 mod pulses;
@@ -15,7 +19,69 @@ mod pulses;
 use credentials::{Credentials, CredentialsError};
 use pulses::{Pulse, PulseFromEditor};
 
+const BINARY_DISTRIBUTION: &'static str =
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/";
+const CLI_VERSION_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/version";
+const EXECUTABLE: &'static str = "activity-insights";
+#[allow(dead_code)]
+const PULSE_API_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
+const REGISTRATION_URL: &'static str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
+const UPDATED_EXECUTABLE: &'static str = ".updated-activity-insights";
+const VERSION: usize = 1;
 pub const PS_DIR: &'static str = ".pluralsight";
+
+#[derive(Debug, Error)]
+pub enum RequestError {
+    #[error("{0}")]
+    HTTP(#[from] reqwest::Error),
+
+    #[error("{0}")]
+    CredentialsError(#[from] CredentialsError),
+
+    #[error("No api token was found in the credentials file. It is required to make a request.")]
+    ApiTokenError,
+}
+
+#[derive(Debug, Error)]
+pub enum RegistrationError {
+    #[error("{0}")]
+    CredentialsError(#[from] CredentialsError),
+
+    #[error("{0}")]
+    IoError(#[from] io::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateError {
+    #[error("Error getting the home directory")]
+    NoHomeDir,
+
+    #[error("{0}")]
+    RequestError(#[from] reqwest::Error),
+
+    #[error("{0}")]
+    IOError(#[from] io::Error),
+
+    #[error("{0}")]
+    DeserializationError(#[from] serde_json::Error),
+}
+
+#[derive(Debug, Serialize)]
+struct PulseRequest<'a> {
+    pulses: &'a Vec<Pulse>,
+}
+
+impl<'a> PulseRequest<'a> {
+    #[allow(dead_code)]
+    fn new(pulses: &'a Vec<Pulse>) -> Self {
+        PulseRequest { pulses }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+struct VersionResponse {
+    version: usize,
+}
 
 pub fn build_pulses(content: &str) -> Result<Vec<Pulse>, serde_json::error::Error> {
     let editor_pulses: Vec<PulseFromEditor> = serde_json::from_str(content)?;
@@ -31,31 +97,6 @@ pub fn build_pulses(content: &str) -> Result<Vec<Pulse>, serde_json::error::Erro
         .collect();
     Ok(pulses)
 }
-
-#[derive(Debug, Serialize)]
-struct PulseRequest<'a> {
-    pulses: &'a Vec<Pulse>,
-}
-
-impl<'a> PulseRequest<'a> {
-    fn new(pulses: &'a Vec<Pulse>) -> Self {
-        PulseRequest { pulses }
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum RequestError {
-    #[error("{0}")]
-    HTTP(#[from] reqwest::Error),
-
-    #[error("{0}")]
-    CredentialsError(#[from] CredentialsError),
-
-    #[error("No api token was found in the credentials file. It is required to make a request.")]
-    ApiTokenError,
-}
-
-const PULSE_API_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 
 #[cfg(not(test))]
 pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, RequestError> {
@@ -95,17 +136,6 @@ pub fn open_browser(url: &str) -> Result<Child, io::Error> {
     Command::new("cmd").args(&["/C", "start", url]).spawn()
 }
 
-#[derive(Debug, Error)]
-pub enum RegistrationError {
-    #[error("{0}")]
-    CredentialsError(#[from] CredentialsError),
-
-    #[error("{0}")]
-    IoError(#[from] io::Error),
-}
-
-const REGISTRATION_URL: &'static str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
-
 pub fn register() -> Result<(), RegistrationError> {
     let mut creds = Credentials::fetch()?;
     let api_token = match creds.api_token() {
@@ -115,5 +145,35 @@ pub fn register() -> Result<(), RegistrationError> {
 
     creds.update_api_token()?;
     open_browser(&format!("{}?apiToken={}", REGISTRATION_URL, api_token))?;
+    Ok(())
+}
+
+pub fn check_for_updates() -> Result<(), UpdateError> {
+    let resp = blocking::get(CLI_VERSION_URL)?;
+    let resp: VersionResponse = serde_json::from_reader(resp)?;
+
+    if resp.version > VERSION {
+        log::info!("Updating cli to version... {}", resp.version);
+        update_cli()
+    } else {
+        Ok(())
+    }
+}
+
+pub fn update_cli() -> Result<(), UpdateError> {
+    let download = blocking::get(BINARY_DISTRIBUTION)?.bytes()?;
+
+    let pluralsight_dir = dirs::home_dir().ok_or(UpdateError::NoHomeDir)?.join(PS_DIR);
+
+    let new_binary = pluralsight_dir.join(format!("{}-{}", UPDATED_EXECUTABLE, Uuid::new_v4()));
+    let old_binary = pluralsight_dir.join(EXECUTABLE);
+
+    let file = File::create(&new_binary)?;
+    let mut writer = BufWriter::new(file);
+    writer.write(&download)?;
+    drop(writer);
+
+    fs::rename(new_binary, old_binary)?;
+
     Ok(())
 }

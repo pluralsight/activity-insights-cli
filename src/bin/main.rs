@@ -16,11 +16,13 @@ use std::{
     process,
 };
 
-use activity_insights_cli::{build_pulses, open_browser, register, send_pulses, PS_DIR};
+use activity_insights_cli::{
+    build_pulses, check_for_updates, open_browser, register, send_pulses, PS_DIR,
+};
 
 const BAD_REGISTRATION_URL: &'static str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
-
 const DASHBOARD_URL: &'static str = "https://app.pluralsight.com/activity-insights-beta/";
+const LOG_FILE: &'static str = "ps-activity-insights.logs";
 
 fn main() {
     create_logger();
@@ -31,9 +33,11 @@ fn main() {
         Some(v) if v.as_str() == "dashboard" => dashboard_command(),
         _ => pulse_command(),
     };
-}
 
-const LOG_FILE: &'static str = "ps-activity-insights.logs";
+    if let Err(e) = check_for_updates() {
+        error!("Error updating cli: {}", e);
+    }
+}
 
 /*
  * Create_logger will exit if it can't create the logger
@@ -73,7 +77,7 @@ fn create_logger() {
     });
 }
 
-pub fn register_command() {
+fn register_command() {
     if let Err(e) = register() {
         error!("Error on registration: {}", e);
         if let Err(e) = open_browser(BAD_REGISTRATION_URL) {
@@ -85,13 +89,13 @@ pub fn register_command() {
     }
 }
 
-pub fn dashboard_command() {
+fn dashboard_command() {
     if let Err(e) = open_browser(DASHBOARD_URL) {
         error!("Error trying to show the user their dashboard: {}", e);
     }
 }
 
-pub fn pulse_command() {
+fn pulse_command() {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
         error!("Error reading from stdin: {}", e);
