@@ -111,9 +111,7 @@ mod tests {
         let editor_pulse: PulseFromEditor =
             serde_json::from_str(content).expect("Failed deserializing editor pulse");
         let pulse = Pulse::try_from(editor_pulse).expect("Error converting to pulse");
-        let tags: HashSet<&'static str> = vec!["config", "dirs", "log", "reqwest"]
-            .into_iter()
-            .collect();
+        let tags: HashSet<&'static str> = vec!["dirs", "reqwest"].into_iter().collect();
 
         let expected = Pulse {
             pulse_type: String::from("typing"),

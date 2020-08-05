@@ -9,7 +9,7 @@ use std::{
     convert::TryFrom,
     fs::{self, File},
     io::{self, BufWriter, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Child, Command},
 };
 use thiserror::Error;
@@ -38,7 +38,6 @@ const EXECUTABLE: &'static str = "activity-insights";
 #[cfg(not(unix))]
 const EXECUTABLE: &'static str = "activity-insights.exe";
 
-#[allow(dead_code)]
 const PULSE_API_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 const REGISTRATION_URL: &'static str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
 const UPDATED_EXECUTABLE: &'static str = ".updated-activity-insights";
@@ -46,39 +45,21 @@ const VERSION: usize = 1;
 pub const PS_DIR: &'static str = ".pluralsight";
 
 #[derive(Debug, Error)]
-pub enum RequestError {
-    #[error("{0}")]
-    HTTP(#[from] reqwest::Error),
+pub enum ActivityInsightsError {
+    #[error("HTTP Error for request to url: {0}\n{1}")]
+    HTTP(String, reqwest::Error),
+
+    #[error("IO Error for location: {0}\n{1}")]
+    IO(PathBuf, io::Error),
 
     #[error("{0}")]
-    CredentialsError(#[from] CredentialsError),
-
-    #[error("No api token was found in the credentials file. It is required to make a request.")]
-    ApiTokenError,
-}
-
-#[derive(Debug, Error)]
-pub enum RegistrationError {
-    #[error("{0}")]
-    CredentialsError(#[from] CredentialsError),
+    Credentials(#[from] CredentialsError),
 
     #[error("{0}")]
-    IoError(#[from] io::Error),
-}
-
-#[derive(Debug, Error)]
-pub enum UpdateError {
-    #[error("Error getting the home directory")]
-    NoHomeDir,
+    Deserialization(#[from] serde_json::Error),
 
     #[error("{0}")]
-    RequestError(#[from] reqwest::Error),
-
-    #[error("{0}")]
-    IOError(#[from] io::Error),
-
-    #[error("{0}")]
-    DeserializationError(#[from] serde_json::Error),
+    Other(String),
 }
 
 #[derive(Debug, Serialize)]
@@ -87,7 +68,6 @@ struct PulseRequest<'a> {
 }
 
 impl<'a> PulseRequest<'a> {
-    #[allow(dead_code)]
     fn new(pulses: &'a Vec<Pulse>) -> Self {
         PulseRequest { pulses }
     }
@@ -114,7 +94,7 @@ pub fn build_pulses(content: &str) -> Result<Vec<Pulse>, serde_json::error::Erro
 }
 
 #[cfg(not(test))]
-pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, RequestError> {
+pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, ActivityInsightsError> {
     let client = Client::new();
     let creds = Credentials::fetch()?;
     match creds.api_token() {
@@ -123,16 +103,26 @@ pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, RequestError> {
                 .post(PULSE_API_URL)
                 .bearer_auth(token)
                 .json(&PulseRequest::new(pulses))
-                .send()?;
+                .send()
+                .map_err(|e| ActivityInsightsError::HTTP(PULSE_API_URL.to_string(), e))?;
             Ok(res.status())
         }
-        None => Err(RequestError::ApiTokenError),
+        None => Err(ActivityInsightsError::Other(String::from(
+            "No api token was found in the config file. Can't send the request without one.",
+        ))),
     }
 }
 
 // Don't actually send the pulses for the tests
 #[cfg(test)]
-pub fn send_pulses(_pulses: &Vec<Pulse>) -> Result<StatusCode, RequestError> {
+pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, ActivityInsightsError> {
+    // loggging out unused variables here to avoid unused warning
+    log::info!(
+        "{:?}, {} {:?}",
+        Client::new(),
+        PULSE_API_URL,
+        PulseRequest::new(pulses)
+    );
     Ok(StatusCode::default())
 }
 
@@ -151,7 +141,7 @@ pub fn open_browser(url: &str) -> Result<Child, io::Error> {
     Command::new("cmd").args(&["/C", "start", url]).spawn()
 }
 
-pub fn register() -> Result<(), RegistrationError> {
+pub fn register() -> Result<(), ActivityInsightsError> {
     let mut creds = Credentials::fetch()?;
     let api_token = match creds.api_token() {
         Some(api_token) => *api_token,
@@ -159,12 +149,14 @@ pub fn register() -> Result<(), RegistrationError> {
     };
 
     creds.update_api_token()?;
-    open_browser(&format!("{}?apiToken={}", REGISTRATION_URL, api_token))?;
+    open_browser(&format!("{}?apiToken={}", REGISTRATION_URL, api_token))
+        .map_err(|e| ActivityInsightsError::IO(PathBuf::from("Opening browser..."), e))?;
     Ok(())
 }
 
-pub fn check_for_updates() -> Result<(), UpdateError> {
-    let resp = blocking::get(CLI_VERSION_URL)?;
+pub fn check_for_updates() -> Result<(), ActivityInsightsError> {
+    let resp = blocking::get(CLI_VERSION_URL)
+        .map_err(|e| ActivityInsightsError::HTTP(CLI_VERSION_URL.to_string(), e))?;
     let resp: VersionResponse = serde_json::from_reader(resp)?;
 
     if resp.version > VERSION {
@@ -175,20 +167,31 @@ pub fn check_for_updates() -> Result<(), UpdateError> {
     }
 }
 
-fn update_cli() -> Result<(), UpdateError> {
-    let download = blocking::get(BINARY_DISTRIBUTION)?.bytes()?;
+fn update_cli() -> Result<(), ActivityInsightsError> {
+    let download = blocking::get(BINARY_DISTRIBUTION)
+        .and_then(|req| req.bytes())
+        .map_err(|e| ActivityInsightsError::HTTP(BINARY_DISTRIBUTION.to_string(), e))?;
 
-    let pluralsight_dir = dirs::home_dir().ok_or(UpdateError::NoHomeDir)?.join(PS_DIR);
+    let pluralsight_dir =
+        dirs::home_dir()
+            .map(|dir| dir.join(PS_DIR))
+            .ok_or(ActivityInsightsError::Other(String::from(
+                "Error getting the home directory",
+            )))?;
 
     let new_binary = pluralsight_dir.join(format!("{}-{}", UPDATED_EXECUTABLE, Uuid::new_v4()));
     let old_binary = pluralsight_dir.join(EXECUTABLE);
 
-    let file = create_executable_file(&new_binary)?;
+    let file = create_executable_file(&new_binary)
+        .map_err(|e| ActivityInsightsError::IO(new_binary.clone(), e))?;
     let mut writer = BufWriter::new(file);
-    writer.write(&download)?;
+    writer
+        .write(&download)
+        .map_err(|e| ActivityInsightsError::IO(new_binary.clone(), e))?;
     drop(writer);
 
-    fs::rename(new_binary, old_binary)?;
+    fs::rename(&new_binary, &old_binary)
+        .map_err(|e| ActivityInsightsError::IO(old_binary.clone(), e))?;
 
     Ok(())
 }
