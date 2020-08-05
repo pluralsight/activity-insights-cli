@@ -9,6 +9,7 @@ use std::{
     convert::TryFrom,
     fs::{self, File},
     io::{self, BufWriter, Write},
+    path::Path,
     process::{Child, Command},
 };
 use thiserror::Error;
@@ -182,7 +183,7 @@ pub fn update_cli() -> Result<(), UpdateError> {
     let new_binary = pluralsight_dir.join(format!("{}-{}", UPDATED_EXECUTABLE, Uuid::new_v4()));
     let old_binary = pluralsight_dir.join(EXECUTABLE);
 
-    let file = File::create(&new_binary)?;
+    let file = create_executable_file(&new_binary)?;
     let mut writer = BufWriter::new(file);
     writer.write(&download)?;
     drop(writer);
@@ -190,4 +191,21 @@ pub fn update_cli() -> Result<(), UpdateError> {
     fs::rename(new_binary, old_binary)?;
 
     Ok(())
+}
+
+#[cfg(not(unix))]
+fn create_executable_file(path: &Path) -> Result<File, io::Error> {
+    File::create(&new_binary)
+}
+
+#[cfg(unix)]
+fn create_executable_file(path: &Path) -> Result<File, io::Error> {
+    use std::fs::OpenOptions;
+    use std::os::unix::fs::OpenOptionsExt;
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .mode(0o777)
+        .open(path)
 }

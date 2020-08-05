@@ -36,6 +36,8 @@ fn main() {
 
     if let Err(e) = check_for_updates() {
         error!("Error updating cli: {}", e);
+    } else {
+        info!("Finished updating the cli");
     }
 }
 
