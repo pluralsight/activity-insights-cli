@@ -195,7 +195,7 @@ pub fn update_cli() -> Result<(), UpdateError> {
 
 #[cfg(not(unix))]
 fn create_executable_file(path: &Path) -> Result<File, io::Error> {
-    File::create(&new_binary)
+    File::create(&path)
 }
 
 #[cfg(unix)]
