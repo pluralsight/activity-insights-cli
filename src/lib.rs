@@ -175,7 +175,7 @@ pub fn check_for_updates() -> Result<(), UpdateError> {
     }
 }
 
-pub fn update_cli() -> Result<(), UpdateError> {
+fn update_cli() -> Result<(), UpdateError> {
     let download = blocking::get(BINARY_DISTRIBUTION)?.bytes()?;
 
     let pluralsight_dir = dirs::home_dir().ok_or(UpdateError::NoHomeDir)?.join(PS_DIR);
