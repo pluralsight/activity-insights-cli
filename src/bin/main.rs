@@ -14,6 +14,9 @@ use std::{
     env,
     io::{self, Read},
     process,
+    sync::mpsc,
+    thread,
+    time::Duration,
 };
 
 use activity_insights_cli::{
@@ -105,15 +108,18 @@ fn dashboard_command() {
 
 fn pulse_command() {
     info!("Starting pulse command");
-    let mut buffer = String::new();
-    io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
-        error!("Error reading from stdin: {}", e);
-        process::exit(1);
-    });
 
-    let pulses = build_pulses(&buffer).unwrap_or_else(|e| {
-        error!("Error building pulses from content: {}\n{}", buffer, e);
-        process::exit(2);
+    let input = match read_from_stdin_with_timeout(Duration::from_millis(10_000)) {
+        Ok(input) => input,
+        Err(e) => {
+            error!("Timedout reading from stdin: {}", e);
+            process::exit(21);
+        }
+    };
+
+    let pulses = build_pulses(&input).unwrap_or_else(|e| {
+        error!("Error building pulses from content: {}\n{}", input, e);
+        process::exit(22);
     });
 
     match send_pulses(&pulses) {
@@ -125,4 +131,26 @@ fn pulse_command() {
             error!("Error sending pulses:{:?}\n{}", pulses, e);
         }
     }
+}
+
+/*
+ * Read from stdin with timeout so the process doesn't hang forever. This could happen if an editor
+ * starts the process but forgets to pipe stdin
+ */
+fn read_from_stdin_with_timeout(duration: Duration) -> Result<String, mpsc::RecvTimeoutError> {
+    let (send, recv) = mpsc::channel();
+
+    thread::spawn(move || {
+        let mut buffer = String::new();
+        io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
+            error!("Error reading from stdin: {}", e);
+            process::exit(20);
+        });
+
+        if let Err(e) = send.send(buffer) {
+            error!("Error sending value across the channel: {}", e)
+        }
+    });
+
+    recv.recv_timeout(duration)
 }
