@@ -41,8 +41,8 @@ const EXECUTABLE: &'static str = "activity-insights.exe";
 const PULSE_API_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 const REGISTRATION_URL: &'static str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
 const UPDATED_EXECUTABLE: &'static str = ".updated-activity-insights";
-const VERSION: usize = 1;
 pub const PS_DIR: &'static str = ".pluralsight";
+const VERSION: usize = 1;
 
 #[derive(Debug, Error)]
 pub enum ActivityInsightsError {
@@ -157,26 +157,34 @@ pub fn register() -> Result<(), ActivityInsightsError> {
     Ok(())
 }
 
-pub fn check_for_updates() -> Result<(), ActivityInsightsError> {
+pub fn maybe_update() -> Result<(), ActivityInsightsError> {
+    match check_for_updates(VERSION) {
+        Ok(true) => {
+            let update_location = dirs::home_dir().map(|dir| dir.join(PS_DIR)).ok_or(
+                ActivityInsightsError::Other(String::from("Error getting the home directory")),
+            )?;
+
+            update_cli(&update_location)
+        }
+        Ok(false) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn check_for_updates(current_version: usize) -> Result<bool, ActivityInsightsError> {
     let resp = blocking::get(CLI_VERSION_URL)
         .map_err(|e| ActivityInsightsError::HTTP(CLI_VERSION_URL.to_string(), e))?;
     let resp: VersionResponse = serde_json::from_reader(resp)?;
 
-    if resp.version > VERSION {
+    if resp.version > current_version {
         info!("Updating cli to version {}...", resp.version);
-        let update_location =
-            dirs::home_dir()
-                .map(|dir| dir.join(PS_DIR))
-                .ok_or(ActivityInsightsError::Other(String::from(
-                    "Error getting the home directory",
-                )))?;
-        update_cli(&update_location)
+        Ok(true)
     } else {
-        Ok(())
+        Ok(false)
     }
 }
 
-fn update_cli(path: &Path) -> Result<(), ActivityInsightsError> {
+pub fn update_cli(path: &Path) -> Result<(), ActivityInsightsError> {
     let download = blocking::get(BINARY_DISTRIBUTION)
         .and_then(|req| req.bytes())
         .map_err(|e| ActivityInsightsError::HTTP(BINARY_DISTRIBUTION.to_string(), e))?;
@@ -239,5 +247,19 @@ mod tests {
 
         #[cfg(not(unix))]
         assert_eq!(filename, String::from("activity-insights"));
+    }
+
+    #[test]
+    fn check_update_required() {
+        let very_old_version = 0;
+        let should_update = check_for_updates(very_old_version).unwrap();
+        assert_eq!(should_update, true)
+    }
+
+    #[test]
+    fn check_update_not_required() {
+        let very_new_version = 10_000_000;
+        let should_update = check_for_updates(very_new_version).unwrap();
+        assert_eq!(should_update, false)
     }
 }

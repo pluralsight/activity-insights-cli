@@ -20,7 +20,7 @@ use std::{
 };
 
 use activity_insights_cli::{
-    build_pulses, check_for_updates, open_browser, register, send_pulses, PS_DIR,
+    build_pulses, maybe_update, open_browser, register, send_pulses, PS_DIR,
 };
 
 const BAD_REGISTRATION_URL: &'static str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
@@ -37,10 +37,8 @@ fn main() {
         _ => pulse_command(),
     };
 
-    if let Err(e) = check_for_updates() {
-        error!("Error updating cli: {}", e);
-    } else {
-        info!("Finished updating the cli");
+    if let Err(e) = maybe_update() {
+        error!("Error updating: {}", e)
     }
 }
 
