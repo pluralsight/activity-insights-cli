@@ -145,10 +145,13 @@ pub fn register() -> Result<(), ActivityInsightsError> {
     let mut creds = Credentials::fetch()?;
     let api_token = match creds.api_token() {
         Some(api_token) => *api_token,
-        None => creds.new_api_token(),
+        None => {
+            let api_token = creds.new_api_token();
+            creds.update_api_token()?;
+            api_token
+        }
     };
 
-    creds.update_api_token()?;
     open_browser(&format!("{}?apiToken={}", REGISTRATION_URL, api_token))
         .map_err(|e| ActivityInsightsError::IO(PathBuf::from("Opening browser..."), e))?;
     Ok(())
