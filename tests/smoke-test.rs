@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 
 #[test]
+#[ignore]
 fn smoke_test() {
     let fake_pulses = r#"
     [

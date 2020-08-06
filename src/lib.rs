@@ -164,26 +164,25 @@ pub fn check_for_updates() -> Result<(), ActivityInsightsError> {
 
     if resp.version > VERSION {
         info!("Updating cli to version {}...", resp.version);
-        update_cli()
+        let update_location =
+            dirs::home_dir()
+                .map(|dir| dir.join(PS_DIR))
+                .ok_or(ActivityInsightsError::Other(String::from(
+                    "Error getting the home directory",
+                )))?;
+        update_cli(&update_location)
     } else {
         Ok(())
     }
 }
 
-fn update_cli() -> Result<(), ActivityInsightsError> {
+fn update_cli(path: &Path) -> Result<(), ActivityInsightsError> {
     let download = blocking::get(BINARY_DISTRIBUTION)
         .and_then(|req| req.bytes())
         .map_err(|e| ActivityInsightsError::HTTP(BINARY_DISTRIBUTION.to_string(), e))?;
 
-    let pluralsight_dir =
-        dirs::home_dir()
-            .map(|dir| dir.join(PS_DIR))
-            .ok_or(ActivityInsightsError::Other(String::from(
-                "Error getting the home directory",
-            )))?;
-
-    let new_binary = pluralsight_dir.join(format!("{}-{}", UPDATED_EXECUTABLE, Uuid::new_v4()));
-    let old_binary = pluralsight_dir.join(EXECUTABLE);
+    let new_binary = path.join(format!("{}-{}", UPDATED_EXECUTABLE, Uuid::new_v4()));
+    let old_binary = path.join(EXECUTABLE);
 
     let file = create_executable_file(&new_binary)
         .map_err(|e| ActivityInsightsError::IO(new_binary.clone(), e))?;
@@ -214,4 +213,31 @@ fn create_executable_file(path: &Path) -> Result<File, io::Error> {
         .create(true)
         .mode(0o777)
         .open(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile;
+
+    #[test]
+    fn updating() {
+        let fake_dir = tempfile::tempdir().unwrap();
+        update_cli(fake_dir.path()).unwrap();
+
+        let entries: Vec<_> = fs::read_dir(fake_dir.path())
+            .unwrap()
+            .map(|x| x.unwrap())
+            .collect();
+        assert_eq!(1, entries.len());
+
+        let new_binary = entries[0].path();
+        let filename = new_binary.file_name().unwrap().to_str().unwrap();
+
+        #[cfg(unix)]
+        assert_eq!(filename, String::from("activity-insights"));
+
+        #[cfg(not(unix))]
+        assert_eq!(filename, String::from("activity-insights"));
+    }
 }
