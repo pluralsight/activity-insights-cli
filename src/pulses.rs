@@ -96,27 +96,37 @@ fn breakdown_milliseconds(ms: i64) -> (i64, u32) {
 mod tests {
     use super::*;
     use serde_json;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn from_payload_to_pulse() {
-        let content = r#"
+        let mut fake_file = NamedTempFile::new().unwrap();
+        let fake_content = r#"
+            use reqwest;
+            const blah = require("express");
+        "#;
+        write!(fake_file, "{}", fake_content).unwrap();
+
+        let raw_pulse = r#"
             {
-              "filePath": "./src/bin/main.rs",
+              "filePath": "{filepath}",
               "eventType": "typing",
               "eventDate": 1595868513238,
               "editor": "emacs 😭"
             }
         "#;
+        let raw_pulse = raw_pulse.replace("{filepath}", fake_file.path().to_str().unwrap());
 
         let editor_pulse: PulseFromEditor =
-            serde_json::from_str(content).expect("Failed deserializing editor pulse");
+            serde_json::from_str(&raw_pulse).expect("Failed deserializing editor pulse");
         let pulse = Pulse::try_from(editor_pulse).expect("Error converting to pulse");
-        let tags: HashSet<&'static str> = vec!["dirs", "reqwest"].into_iter().collect();
+        let tags: HashSet<&'static str> = vec!["express", "reqwest"].into_iter().collect();
 
         let expected = Pulse {
             pulse_type: String::from("typing"),
             date: String::from("2020-07-27T16:48:33.238+00:00"),
-            programming_language: String::from("Rust"),
+            programming_language: String::from("Other"),
             editor: String::from("emacs 😭"),
             tags,
         };
