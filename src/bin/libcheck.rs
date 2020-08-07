@@ -7,10 +7,11 @@ use std::path::Path;
 include!("../codegen/packages-set.rs");
 
 fn main() {
-    let file = env::args().skip(1).next().expect("No filename provided");
+    let file = env::args().nth(1).expect("No filename provided");
     let file = Path::new(&file);
 
-    let content = fs::read_to_string(&file).expect(&format!("Can't read from file: {:?}", file));
+    let content =
+        fs::read_to_string(&file).unwrap_or_else(|_| panic!("Can't read from file: {:?}", file));
     let tags: HashSet<&'static str> = Tokenizer::new(&content)
         .tokens()
         .filter_map(|token| match token {

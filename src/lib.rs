@@ -4,7 +4,6 @@ use reqwest::{
     StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::{
     convert::TryFrom,
     fs::{self, File},
@@ -22,26 +21,26 @@ use credentials::{Credentials, CredentialsError};
 use pulses::{Pulse, PulseFromEditor};
 
 #[cfg(target_os = "linux")]
-const BINARY_DISTRIBUTION: &'static str =
+const BINARY_DISTRIBUTION: &str =
     "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/linux/ps-time";
 #[cfg(target_os = "macos")]
-const BINARY_DISTRIBUTION: &'static str =
+const BINARY_DISTRIBUTION: &str =
     "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/ps-time";
 #[cfg(target_os = "windows")]
-const BINARY_DISTRIBUTION: &'static str =
+const BINARY_DISTRIBUTION: &str =
     "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/windows/ps-time.exe";
 
-const CLI_VERSION_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/version";
+const CLI_VERSION_URL: &str = "https://app.pluralsight.com/wsd/api/ps-time/version";
 
 #[cfg(unix)]
-const EXECUTABLE: &'static str = "activity-insights";
+const EXECUTABLE: &str = "activity-insights";
 #[cfg(not(unix))]
-const EXECUTABLE: &'static str = "activity-insights.exe";
+const EXECUTABLE: &str = "activity-insights.exe";
 
-const PULSE_API_URL: &'static str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
-const REGISTRATION_URL: &'static str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
-const UPDATED_EXECUTABLE: &'static str = ".updated-activity-insights";
-pub const PS_DIR: &'static str = ".pluralsight";
+const PULSE_API_URL: &str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
+const REGISTRATION_URL: &str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
+const UPDATED_EXECUTABLE: &str = ".updated-activity-insights";
+pub const PS_DIR: &str = ".pluralsight";
 const VERSION: usize = 1;
 
 #[derive(Debug, Error)]
@@ -64,11 +63,11 @@ pub enum ActivityInsightsError {
 
 #[derive(Debug, Serialize)]
 struct PulseRequest<'a> {
-    pulses: &'a Vec<Pulse>,
+    pulses: &'a [Pulse],
 }
 
 impl<'a> PulseRequest<'a> {
-    fn new(pulses: &'a Vec<Pulse>) -> Self {
+    fn new(pulses: &'a [Pulse]) -> Self {
         PulseRequest { pulses }
     }
 }
@@ -94,7 +93,7 @@ pub fn build_pulses(content: &str) -> Result<Vec<Pulse>, serde_json::error::Erro
 }
 
 #[cfg(not(test))]
-pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, ActivityInsightsError> {
+pub fn send_pulses(pulses: &[Pulse]) -> Result<StatusCode, ActivityInsightsError> {
     let client = Client::new();
     let creds = Credentials::fetch()?;
     match creds.api_token() {
@@ -160,9 +159,14 @@ pub fn register() -> Result<(), ActivityInsightsError> {
 pub fn maybe_update() -> Result<(), ActivityInsightsError> {
     match check_for_updates(VERSION) {
         Ok(true) => {
-            let update_location = dirs::home_dir().map(|dir| dir.join(PS_DIR)).ok_or(
-                ActivityInsightsError::Other(String::from("Error getting the home directory")),
-            )?;
+            let update_location =
+                dirs::home_dir()
+                    .map(|dir| dir.join(PS_DIR))
+                    .ok_or_else(|| {
+                        ActivityInsightsError::Other(String::from(
+                            "Error getting the home directory",
+                        ))
+                    })?;
 
             update_cli(&update_location)
         }

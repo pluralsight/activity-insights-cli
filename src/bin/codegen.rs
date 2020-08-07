@@ -5,8 +5,8 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Write},
 };
 
-const PACKAGES_LIST: &'static str = "common-packages.txt";
-const PACKAGES_CODEGEN: &'static str = "src/codegen/packages-set.rs";
+const PACKAGES_LIST: &str = "common-packages.txt";
+const PACKAGES_CODEGEN: &str = "src/codegen/packages-set.rs";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let packages_file = File::open(PACKAGES_LIST)?;

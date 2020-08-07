@@ -1,8 +1,6 @@
-use dirs;
 use fs2::FileExt;
 use log::warn;
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use std::{
     fs::{self, File, OpenOptions},
     path::PathBuf,
@@ -12,9 +10,9 @@ use uuid::Uuid;
 
 use crate::{ActivityInsightsError, PS_DIR};
 
-const CRED_FILE_NAME: &'static str = "credentials.yaml";
-const UPDATE_FILE_NAME: &'static str = ".updated.credentials.yaml";
-const LOCK_FILE_NAME: &'static str = "credentials.yaml.lock";
+const CRED_FILE_NAME: &str = "credentials.yaml";
+const UPDATE_FILE_NAME: &str = ".updated.credentials.yaml";
+const LOCK_FILE_NAME: &str = "credentials.yaml.lock";
 
 #[derive(Error, Debug)]
 pub enum CredentialsError {
@@ -45,9 +43,9 @@ impl Credentials {
     pub fn fetch() -> Result<Self, ActivityInsightsError> {
         let creds_file = dirs::home_dir()
             .map(|dir| dir.join(PS_DIR).join(CRED_FILE_NAME))
-            .ok_or(ActivityInsightsError::Other(String::from(
-                "Can't find the home directory",
-            )))?;
+            .ok_or_else(|| {
+                ActivityInsightsError::Other(String::from("Can't find the home directory"))
+            })?;
 
         let file = OpenOptions::new()
             .read(true)
@@ -84,9 +82,9 @@ impl Credentials {
         if !self.has_exclusive_lock() {
             let lock_file = dirs::home_dir()
                 .map(|dir| dir.join(PS_DIR).join(LOCK_FILE_NAME))
-                .ok_or(ActivityInsightsError::Other(String::from(
-                    "Error getting the home directory",
-                )))?;
+                .ok_or_else(|| {
+                    ActivityInsightsError::Other(String::from("Error getting the home directory"))
+                })?;
 
             // first create the file if it doesn't exist
             OpenOptions::new()
@@ -103,7 +101,7 @@ impl Credentials {
             self.has_exclusive_lock = true;
             Ok(file)
         } else {
-            Err(CredentialsError::HasExclusiveLock)?
+            Err(CredentialsError::HasExclusiveLock.into())
         }
     }
 
@@ -131,18 +129,18 @@ impl Credentials {
      */
     fn update(&self) -> Result<(), ActivityInsightsError> {
         if !self.has_exclusive_lock() {
-            return Err(CredentialsError::NeedsExclusiveLock)?;
+            return Err(CredentialsError::NeedsExclusiveLock.into());
         };
 
-        let home_dir = dirs::home_dir().ok_or(ActivityInsightsError::Other(String::from(
-            "Error finding the home directory",
-        )))?;
+        let home_dir = dirs::home_dir().ok_or_else(|| {
+            ActivityInsightsError::Other(String::from("Error finding the home directory"))
+        })?;
         let updated_creds_file = home_dir.join(PS_DIR).join(UPDATE_FILE_NAME);
         let actual_creds_file = home_dir.join(PS_DIR).join(CRED_FILE_NAME);
 
         fs::write(
             &updated_creds_file,
-            serde_yaml::to_vec(self).map_err(|e| CredentialsError::from(e))?,
+            serde_yaml::to_vec(self).map_err(CredentialsError::from)?,
         )
         .map_err(|e| ActivityInsightsError::IO(updated_creds_file.clone(), e))?;
         fs::rename(&updated_creds_file, &actual_creds_file)
@@ -158,19 +156,20 @@ impl Credentials {
      * token that is in the file.
      */
     pub fn update_api_token(&mut self) -> Result<(), ActivityInsightsError> {
-        if let None = self.api_token() {
-            return Err(CredentialsError::ApiTokenRequired)?;
+        if self.api_token().is_none() {
+            return Err(CredentialsError::ApiTokenRequired.into());
         }
+
         if self.has_exclusive_lock() {
-            return Err(CredentialsError::HasExclusiveLock)?;
+            return Err(CredentialsError::HasExclusiveLock.into());
         }
 
         let lock_file = self.get_exclusive_lock()?;
 
         // Check to see if an api token has already been set
         let fresh_creds = Credentials::fetch()?;
-        if let Some(_) = fresh_creds.api_token() {
-            return Err(CredentialsError::HasApiToken)?;
+        if fresh_creds.api_token().is_some() {
+            return Err(CredentialsError::HasApiToken.into());
         }
 
         self.update()?;

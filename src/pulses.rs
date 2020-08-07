@@ -3,7 +3,6 @@
 include!("./codegen/packages-set.rs");
 
 use chrono::{TimeZone, Utc};
-use hyperpolyglot;
 use polyglot_tokenizer::{Token, Tokenizer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;

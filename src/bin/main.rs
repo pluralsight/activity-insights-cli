@@ -1,4 +1,3 @@
-use dirs;
 use log::{error, info, LevelFilter};
 use log4rs::{
     append::rolling_file::{
@@ -23,15 +22,15 @@ use activity_insights_cli::{
     build_pulses, maybe_update, open_browser, register, send_pulses, PS_DIR,
 };
 
-const BAD_REGISTRATION_URL: &'static str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
-const DASHBOARD_URL: &'static str = "https://app.pluralsight.com/activity-insights-beta/";
-const LOG_FILE: &'static str = "ps-activity-insights.logs";
+const BAD_REGISTRATION_URL: &str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
+const DASHBOARD_URL: &str = "https://app.pluralsight.com/activity-insights-beta/";
+const LOG_FILE: &str = "ps-activity-insights.logs";
 
 fn main() {
     create_logger();
     info!("Starting cli...");
 
-    match env::args().skip(1).next() {
+    match env::args().nth(1) {
         Some(v) if v.as_str() == "register" => register_command(),
         Some(v) if v.as_str() == "dashboard" => dashboard_command(),
         _ => pulse_command(),
