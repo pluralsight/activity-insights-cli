@@ -89,9 +89,12 @@ fn register_command() {
                 "Error trying to let the user know a registration went bad: {}",
                 e
             );
+            process::exit(31);
         } else {
             info!("Register successfully ran");
         }
+    } else {
+        process::exit(30);
     }
 }
 
@@ -99,6 +102,7 @@ fn dashboard_command() {
     info!("Starting dashboard command");
     if let Err(e) = open_browser(DASHBOARD_URL) {
         error!("Error trying to show the user their dashboard: {}", e);
+        process::exit(40);
     } else {
         info!("Dashboard successfully opened");
     }
@@ -127,6 +131,7 @@ fn pulse_command() {
         Ok(code) => info!("Unexpected status code for pulses: {:?}\n{}", pulses, code),
         Err(e) => {
             error!("Error sending pulses:{:?}\n{}", pulses, e);
+            process::exit(23);
         }
     }
 }
