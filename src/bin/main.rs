@@ -24,7 +24,7 @@ use activity_insights_cli::{
 
 const BAD_REGISTRATION_URL: &str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
 const DASHBOARD_URL: &str = "https://app.pluralsight.com/activity-insights-beta/";
-const LOG_FILE: &str = "ps-activity-insights.logs";
+const LOG_FILE: &str = "activity-insights.logs";
 const TOS_VERSION: u8 = 1;
 
 fn main() {
