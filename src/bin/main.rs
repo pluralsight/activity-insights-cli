@@ -19,21 +19,28 @@ use std::{
 };
 
 use activity_insights_cli::{
-    build_pulses, maybe_update, open_browser, register, send_pulses, PS_DIR,
+    build_pulses, maybe_update, open_browser, register, send_pulses, Credentials, PS_DIR,
 };
 
 const BAD_REGISTRATION_URL: &str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
 const DASHBOARD_URL: &str = "https://app.pluralsight.com/activity-insights-beta/";
 const LOG_FILE: &str = "ps-activity-insights.logs";
+const TOS_VERSION: u8 = 1;
 
 fn main() {
     create_logger();
     info!("Starting cli...");
 
     match env::args().nth(1) {
-        Some(v) if v.as_str() == "register" => register_command(),
-        Some(v) if v.as_str() == "dashboard" => dashboard_command(),
-        _ => pulse_command(),
+        Some(v) if v.as_str() == "accept_tos" => accept_tos_command(),
+        _ => {
+            check_tos();
+            match env::args().nth(1) {
+                Some(v) if v.as_str() == "register" => register_command(),
+                Some(v) if v.as_str() == "dashboard" => dashboard_command(),
+                _ => pulse_command(),
+            }
+        }
     };
 
     if let Err(e) = maybe_update() {
@@ -77,6 +84,17 @@ fn create_logger() {
         eprintln!("Failed to initialize logger: {}", e);
         process::exit(13);
     });
+}
+
+fn check_tos() {
+    let creds = Credentials::fetch().unwrap_or_else(|e| {
+        error!("Unable to get creds file: {}", e);
+        process::exit(101)
+    });
+
+    if !creds.has_accepted_latest(TOS_VERSION) {
+        process::exit(100)
+    }
 }
 
 fn register_command() {
@@ -133,6 +151,18 @@ fn pulse_command() {
             process::exit(23);
         }
     }
+}
+
+fn accept_tos_command() {
+    let mut creds = Credentials::fetch().unwrap_or_else(|e| {
+        error!("Unable to get creds file: {}", e);
+        process::exit(101)
+    });
+
+    creds.accept_tos(TOS_VERSION).unwrap_or_else(|e| {
+        error!("Error accepting TOS {}: {}", TOS_VERSION, e);
+        process::exit(102)
+    });
 }
 
 /*

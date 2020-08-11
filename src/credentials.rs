@@ -35,6 +35,7 @@ pub enum CredentialsError {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Credentials {
     api_token: Option<Uuid>,
+    latest_accepted_tos: Option<u8>,
     #[serde(skip)]
     has_exclusive_lock: bool,
 }
@@ -59,6 +60,7 @@ impl Credentials {
                 warn!("Error deserializing yaml: {}", e);
                 Credentials {
                     api_token: None,
+                    latest_accepted_tos: None,
                     has_exclusive_lock: false,
                 }
             }
@@ -68,6 +70,14 @@ impl Credentials {
 
     pub fn api_token(&self) -> &Option<Uuid> {
         &self.api_token
+    }
+
+    pub fn has_accepted_latest(&self, latest_version: u8) -> bool {
+        if let Some(val) = self.latest_accepted_tos {
+            val >= latest_version
+        } else {
+            false
+        }
     }
 
     pub fn has_exclusive_lock(&self) -> bool {
@@ -171,6 +181,25 @@ impl Credentials {
         if fresh_creds.api_token().is_some() {
             return Err(CredentialsError::HasApiToken.into());
         }
+        self.latest_accepted_tos = fresh_creds.latest_accepted_tos;
+
+        self.update()?;
+
+        self.release_exclusive_lock(lock_file)?;
+
+        Ok(())
+    }
+
+    pub fn accept_tos(&mut self, tos_version: u8) -> Result<(), ActivityInsightsError> {
+        if self.has_exclusive_lock() {
+            return Err(CredentialsError::HasExclusiveLock.into());
+        }
+
+        let lock_file = self.get_exclusive_lock()?;
+
+        let fresh_creds = Credentials::fetch()?;
+        self.api_token = fresh_creds.api_token;
+        self.latest_accepted_tos = Some(tos_version);
 
         self.update()?;
 

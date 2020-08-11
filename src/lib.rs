@@ -17,7 +17,7 @@ use uuid::Uuid;
 mod credentials;
 mod pulses;
 
-use credentials::{Credentials, CredentialsError};
+pub use credentials::{Credentials, CredentialsError};
 use pulses::{Pulse, PulseFromEditor};
 
 #[cfg(target_os = "linux")]
