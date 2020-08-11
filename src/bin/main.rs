@@ -107,11 +107,7 @@ fn register_command() {
                 e
             );
             process::exit(31);
-        } else {
-            info!("Register successfully ran");
         }
-    } else {
-        process::exit(30);
     }
 }
 
