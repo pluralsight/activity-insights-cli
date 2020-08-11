@@ -1,5 +1,5 @@
 # Activity Insights CLI
-The command line interface used in [Pluralsight Activity Inights Beta](https://app.pluralsight.com/activity-insights-beta/)
+The command line interface used in [Pluralsight Activity Insights Beta](https://app.pluralsight.com/activity-insights-beta/)
 
 ## License
 
