@@ -26,6 +26,8 @@ const BAD_REGISTRATION_URL: &str =  "https://app.pluralsight.com/id?redirectTo=h
 const DASHBOARD_URL: &str = "https://app.pluralsight.com/activity-insights-beta/";
 const LOG_FILE: &str = "activity-insights.logs";
 const TOS_VERSION: u8 = 1;
+const TOS: &str = "By syncing your text editor(s) and calendar(s), you agree to share information from your text editor to enable us to make learning recommendations based on your programming activity. Pluralsight gathers the time of day and duration of each coding session, the language(s) you use to code, and the libraries in your code. Syncing your calendar enables us to make recommendations for learning times that may work best for you based on your scheduled meetings. Pluralsight does not see any meeting details other than blocked times and does not store calendar information once you have disconnected from this service, nor do we copy your source code. If you do not want to share this data with Pluralsight, please do not sync your text editor(s) or calendar(s). Use of this service and all data gathered is subject to Pluralsight’s Terms of Use and Privacy Policy.";
+const NOT_ACCEPTED_TOS_EXIT_CODE: i32 = 100;
 
 fn main() {
     create_logger();
@@ -93,7 +95,8 @@ fn check_tos() {
     });
 
     if !creds.has_accepted_latest(TOS_VERSION) {
-        process::exit(100)
+        println!("{}", TOS);
+        process::exit(NOT_ACCEPTED_TOS_EXIT_CODE)
     }
 }
 
