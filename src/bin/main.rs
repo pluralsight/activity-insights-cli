@@ -57,7 +57,7 @@ fn main() {
 fn create_logger() {
     let mut log_dir = dirs::home_dir().unwrap_or_else(|| {
         eprintln!("Error finding home dir");
-        process::exit(10);
+        exit(10);
     });
     log_dir.push(PS_DIR);
     log_dir.push(LOG_FILE);
@@ -71,7 +71,7 @@ fn create_logger() {
         .build(log_dir, Box::new(rotation_policy))
         .unwrap_or_else(|e| {
             eprintln!("Can't create the log file: {}", e);
-            process::exit(11);
+            exit(11);
         });
 
     let config = Config::builder()
@@ -79,24 +79,24 @@ fn create_logger() {
         .build(Root::builder().appender("logger").build(LevelFilter::Info))
         .unwrap_or_else(|e| {
             eprintln!("Can't create the logger config: {}", e);
-            process::exit(12);
+            exit(12);
         });
 
     log4rs::init_config(config).unwrap_or_else(|e| {
         eprintln!("Failed to initialize logger: {}", e);
-        process::exit(13);
+        exit(13);
     });
 }
 
 fn check_tos() {
     let creds = Credentials::fetch().unwrap_or_else(|e| {
         error!("Unable to get creds file: {}", e);
-        process::exit(101)
+        exit(101)
     });
 
     if !creds.has_accepted_latest(TOS_VERSION) {
         println!("{}", TOS);
-        process::exit(NOT_ACCEPTED_TOS_EXIT_CODE)
+        exit(NOT_ACCEPTED_TOS_EXIT_CODE)
     }
 }
 
@@ -109,7 +109,7 @@ fn register_command() {
                 "Error trying to let the user know a registration went bad: {}",
                 e
             );
-            process::exit(31);
+            exit(31);
         }
     }
 }
@@ -118,7 +118,7 @@ fn dashboard_command() {
     info!("Starting dashboard command");
     if let Err(e) = open_browser(DASHBOARD_URL) {
         error!("Error trying to show the user their dashboard: {}", e);
-        process::exit(40);
+        exit(40);
     } else {
         info!("Dashboard successfully opened");
     }
@@ -131,13 +131,13 @@ fn pulse_command() {
         Ok(input) => input,
         Err(e) => {
             error!("Timedout reading from stdin: {}", e);
-            process::exit(21);
+            exit(21);
         }
     };
 
     let pulses = build_pulses(&input).unwrap_or_else(|e| {
         error!("Error building pulses from content: {}\n{}", input, e);
-        process::exit(22);
+        exit(22);
     });
 
     match send_pulses(&pulses) {
@@ -147,7 +147,7 @@ fn pulse_command() {
         Ok(code) => info!("Unexpected status code for pulses: {:?}\n{}", pulses, code),
         Err(e) => {
             error!("Error sending pulses:{:?}\n{}", pulses, e);
-            process::exit(23);
+            exit(23);
         }
     }
 }
@@ -155,12 +155,12 @@ fn pulse_command() {
 fn accept_tos_command() {
     let mut creds = Credentials::fetch().unwrap_or_else(|e| {
         error!("Unable to get creds file: {}", e);
-        process::exit(101)
+        exit(101)
     });
 
     creds.accept_tos(TOS_VERSION).unwrap_or_else(|e| {
         error!("Error accepting TOS {}: {}", TOS_VERSION, e);
-        process::exit(102)
+        exit(102)
     });
 }
 
@@ -175,7 +175,7 @@ fn read_from_stdin_with_timeout(duration: Duration) -> Result<String, mpsc::Recv
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
             error!("Error reading from stdin: {}", e);
-            process::exit(20);
+            exit(20);
         });
 
         if let Err(e) = send.send(buffer) {
@@ -184,4 +184,9 @@ fn read_from_stdin_with_timeout(duration: Duration) -> Result<String, mpsc::Recv
     });
 
     recv.recv_timeout(duration)
+}
+
+fn exit(code: i32) -> ! {
+    error!("Exiting with code: {}", code);
+    process::exit(code);
 }
