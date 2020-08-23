@@ -3,18 +3,15 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{ActivityInsightsError, PS_DIR};
 
-#[cfg(not(test))]
 const CRED_FILE_NAME: &str = "credentials.yaml";
-#[cfg(not(test))]
 const UPDATE_FILE_NAME: &str = ".updated.credentials.yaml";
-#[cfg(not(test))]
 const LOCK_FILE_NAME: &str = "credentials.yaml.lock";
 
 #[derive(Error, Debug)]
@@ -41,30 +38,60 @@ pub struct Credentials {
     latest_accepted_tos: Option<u8>,
     #[serde(skip)]
     lock_file: Option<File>,
+    #[serde(skip)]
+    location: PathBuf,
 }
 
 impl Credentials {
     pub fn fetch() -> Result<Self, ActivityInsightsError> {
-        let creds_file = dirs::home_dir()
-            .map(|dir| dir.join(PS_DIR).join(CRED_FILE_NAME))
+        let creds_dir = dirs::home_dir()
+            .map(|dir| dir.join(PS_DIR))
             .ok_or_else(|| {
                 ActivityInsightsError::Other(String::from("Can't find the home directory"))
             })?;
 
+        Self::fetch_from_dir(&creds_dir)
+    }
+
+    fn fetch_from_dir(dir: &Path) -> Result<Self, ActivityInsightsError> {
+        let path = dir.join(CRED_FILE_NAME);
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(&creds_file)
-            .map_err(|e| ActivityInsightsError::IO(creds_file, e))?;
+            .open(&path)
+            .map_err(|e| ActivityInsightsError::IO(path.to_path_buf(), e))?;
+
         let creds: Credentials = match serde_yaml::from_reader(file) {
-            Ok(creds) => creds,
+            Ok(creds) => Credentials {
+                location: dir.to_path_buf(),
+                ..creds
+            },
             Err(e) => {
                 warn!("Error deserializing yaml: {}", e);
-                Default::default()
+                Credentials {
+                    location: dir.to_path_buf(),
+                    ..Default::default()
+                }
             }
         };
         Ok(creds)
+    }
+
+    fn fetch_latest(&self) -> Result<Credentials, ActivityInsightsError> {
+        Self::fetch_from_dir(&self.location)
+    }
+
+    fn creds_file_path(&self) -> PathBuf {
+        self.location.join(CRED_FILE_NAME)
+    }
+
+    fn temp_update_file_path(&self) -> PathBuf {
+        self.location.join(UPDATE_FILE_NAME)
+    }
+
+    fn lock_file_path(&self) -> PathBuf {
+        self.location.join(LOCK_FILE_NAME)
     }
 
     pub fn api_token(&self) -> &Option<Uuid> {
@@ -87,11 +114,7 @@ impl Credentials {
     /// credentials on disk. Call realase_lock with the file passed back to release the lock
     pub fn get_exclusive_lock(&mut self) -> Result<&mut Self, ActivityInsightsError> {
         if !self.has_exclusive_lock() {
-            let lock_file = dirs::home_dir()
-                .map(|dir| dir.join(PS_DIR).join(LOCK_FILE_NAME))
-                .ok_or_else(|| {
-                    ActivityInsightsError::Other(String::from("Error getting the home directory"))
-                })?;
+            let lock_file = self.lock_file_path();
 
             // We do this so it creates the file if it doesn't exist instead of erroring
             OpenOptions::new()
@@ -130,19 +153,15 @@ impl Credentials {
             return Err(CredentialsError::NeedsExclusiveLock.into());
         };
 
-        let home_dir = dirs::home_dir().ok_or_else(|| {
-            ActivityInsightsError::Other(String::from("Error finding the home directory"))
-        })?;
-        let updated_creds_file = home_dir.join(PS_DIR).join(UPDATE_FILE_NAME);
-        let actual_creds_file = home_dir.join(PS_DIR).join(CRED_FILE_NAME);
+        let temp_update_path = self.temp_update_file_path();
 
         fs::write(
-            &updated_creds_file,
+            &temp_update_path,
             serde_yaml::to_vec(self).map_err(CredentialsError::from)?,
         )
-        .map_err(|e| ActivityInsightsError::IO(updated_creds_file.clone(), e))?;
-        fs::rename(&updated_creds_file, &actual_creds_file)
-            .map_err(|e| ActivityInsightsError::IO(updated_creds_file.clone(), e))?;
+        .map_err(|e| ActivityInsightsError::IO(temp_update_path.clone(), e))?;
+        fs::rename(&temp_update_path, &self.creds_file_path())
+            .map_err(|e| ActivityInsightsError::IO(temp_update_path.clone(), e))?;
 
         Ok(())
     }
@@ -158,8 +177,16 @@ impl Credentials {
 
         self.get_exclusive_lock()?;
 
-        let fresh_creds = Credentials::fetch()?;
+        let fresh_creds = match self.fetch_latest() {
+            Ok(creds) => creds,
+            Err(e) => {
+                self.release_exclusive_lock()?;
+                return Err(e);
+            }
+        };
+
         if fresh_creds.api_token().is_some() {
+            self.release_exclusive_lock()?;
             return Err(CredentialsError::HasApiToken.into());
         }
 
@@ -167,7 +194,10 @@ impl Credentials {
         let new_token = Uuid::new_v4();
         self.api_token = Some(new_token);
 
-        self.update()?;
+        if let Err(e) = self.update() {
+            self.release_exclusive_lock()?;
+            return Err(e);
+        }
 
         self.release_exclusive_lock()?;
 
@@ -177,11 +207,21 @@ impl Credentials {
     pub fn accept_tos(&mut self, tos_version: u8) -> Result<(), ActivityInsightsError> {
         self.get_exclusive_lock()?;
 
-        let fresh_creds = Credentials::fetch()?;
+        let fresh_creds = match self.fetch_latest() {
+            Ok(creds) => creds,
+            Err(e) => {
+                self.release_exclusive_lock()?;
+                return Err(e);
+            }
+        };
+
         self.api_token = fresh_creds.api_token;
         self.latest_accepted_tos = Some(tos_version);
 
-        self.update()?;
+        if let Err(e) = self.update() {
+            self.release_exclusive_lock()?;
+            return Err(e);
+        }
 
         self.release_exclusive_lock()?;
         Ok(())
@@ -189,32 +229,81 @@ impl Credentials {
 }
 
 #[cfg(test)]
-const CRED_FILE_NAME: &str = "test-creds.yaml";
-#[cfg(test)]
-const UPDATE_FILE_NAME: &str = ".updated.test-creds.yaml";
-#[cfg(test)]
-const LOCK_FILE_NAME: &str = "test-creds.yaml.lock";
-
-#[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
-    fn test_create_api_token() {
-        let home = dirs::home_dir().expect("Couldn't get home dir in test");
-        let fake_creds_file = home.join(PS_DIR).join(CRED_FILE_NAME);
-        #[allow(unused_must_use)]
-        {
-            // removing here in case it didn't get removed from the last test
-            fs::remove_file(&fake_creds_file);
-        }
+    fn create_api_token() {
+        let fake_dir = tempdir().unwrap();
 
-        let mut creds = Credentials::fetch().unwrap();
+        let mut creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
         let api_token = creds.create_api_token().unwrap();
 
-        let updated_creds = Credentials::fetch().unwrap();
+        let updated_creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
 
-        fs::remove_file(&fake_creds_file).unwrap();
-        assert_eq!(Some(api_token), updated_creds.api_token);
+        assert_eq!(updated_creds.api_token, Some(api_token));
+    }
+
+    #[test]
+    fn api_token_lock_failure() {
+        let fake_dir = tempdir().unwrap();
+
+        let mut creds_with_lock = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+        let mut creds_without_lock = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+
+        creds_with_lock.get_exclusive_lock().unwrap();
+        match creds_without_lock.create_api_token() {
+            Err(ActivityInsightsError::IO(_, e)) => {
+                assert_eq!(e.kind(), std::io::ErrorKind::WouldBlock)
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn api_token_releases_lock() {
+        let fake_dir = tempdir().unwrap();
+
+        let mut api_creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+        api_creds.create_api_token().unwrap();
+        assert!(api_creds.lock_file.is_none());
+
+        let mut creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+        creds.get_exclusive_lock().unwrap();
+    }
+
+    #[test]
+    fn accept_tos() {
+        let fake_dir = tempdir().unwrap();
+
+        let mut creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+        creds.accept_tos(100).unwrap();
+
+        let updated_creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+        assert_eq!(updated_creds.latest_accepted_tos, Some(100));
+    }
+
+    #[test]
+    fn chaos_test() {
+        let fake_dir = tempdir().unwrap();
+        let fake_path = fake_dir.path();
+
+        let mut creds = Credentials::fetch_from_dir(fake_path).unwrap();
+        let api_token = creds.create_api_token().unwrap();
+
+        for i in 0..=100 {
+            let mut creds = Credentials::fetch_from_dir(fake_path).unwrap();
+            #[allow(unused_must_use)]
+            {
+                creds.create_api_token();
+            }
+            creds.accept_tos(i).unwrap();
+        }
+
+        let updated_creds = Credentials::fetch_from_dir(fake_path).unwrap();
+        let actual = (updated_creds.api_token, updated_creds.latest_accepted_tos);
+        let expected = (Some(api_token), Some(100));
+        assert_eq!(actual, expected);
     }
 }
