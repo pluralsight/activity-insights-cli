@@ -10,9 +10,7 @@ use std::fs;
 use std::{convert::TryFrom, path::PathBuf};
 use thiserror::Error;
 
-/*
- * event_date is milliseconds seconds since the Unix epoch
- */
+/// event_date is milliseconds seconds since the Unix epoch
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PulseFromEditor {
@@ -22,9 +20,7 @@ pub struct PulseFromEditor {
     editor: String,
 }
 
-/*
- * date is a string representing a date formatted according to: https://tools.ietf.org/html/rfc3339
- */
+/// date is a string representing a date formatted according to: https://tools.ietf.org/html/rfc3339
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct Pulse {
     #[serde(rename(serialize = "type"))]
@@ -42,11 +38,9 @@ pub enum ConversionError {
     IOError(PathBuf, std::io::Error),
 }
 
-/*
- * TryFrom will fail in the event of an io error but not if the programming language can't be
- * detected. If the programming language can't be detected, then "Other" will be the  value of
- * programming language
- */
+/// TryFrom will fail in the event of an io error but not if the programming language can't be
+/// detected. If the programming language can't be detected, then "Other" will be the  value of
+/// programming language
 impl TryFrom<PulseFromEditor> for Pulse {
     type Error = ConversionError;
 
@@ -80,11 +74,9 @@ impl TryFrom<PulseFromEditor> for Pulse {
     }
 }
 
-/*
- * Takes a unix timestamp in ms and breaks it down into the number of seconds and nano seconds.
- * This is the way chrono expects the time when generating a Utc timestamp and it comes out of the
- * editors in ms
- */
+/// Takes a unix timestamp in ms and breaks it down into the number of seconds and nano seconds.
+/// This is the way chrono expects the time when generating a Utc timestamp and it comes out of the
+/// editors in ms
 fn breakdown_milliseconds(ms: i64) -> (i64, u32) {
     let seconds = ms.div_euclid(1000);
     let nanoseconds = (ms % 1000) * 1_000_000;
