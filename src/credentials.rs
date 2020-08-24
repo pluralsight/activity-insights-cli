@@ -306,4 +306,16 @@ mod tests {
         let expected = (Some(api_token), Some(100));
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn lock_releases_on_drop() {
+        let fake_dir = tempdir().unwrap();
+
+        let mut creds1 = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+        creds1.get_exclusive_lock().unwrap();
+        drop(creds1);
+
+        let mut creds2 = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
+        creds2.get_exclusive_lock().unwrap();
+    }
 }
