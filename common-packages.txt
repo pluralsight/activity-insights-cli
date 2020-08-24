@@ -34,7 +34,6 @@ FunScript
 Globalization
 HtmlAgilityPack
 IdentityModel
-IdentityModel
 JwtBearer
 Linq
 Markdown
@@ -105,7 +104,6 @@ ava
 awscli
 axios
 azure-common
-babel
 babel
 babel-core
 babel-loader
@@ -307,7 +305,6 @@ minitest
 mio
 mkdirp
 mocha
-mocha
 mockito
 mongodb
 mongoid
@@ -371,7 +368,6 @@ progressbar2
 prompt_toolkit
 prop-types
 proptest
-protobuf
 protobuf
 protractor
 pry
@@ -477,7 +473,6 @@ syn
 syntex
 tabulate
 tenacity
-termcolor
 termcolor
 termion
 timecop
