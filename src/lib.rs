@@ -11,8 +11,8 @@ use std::{
     path::{Path, PathBuf},
     process::{Child, Command},
 };
+use tempfile::NamedTempFile;
 use thiserror::Error;
-use uuid::Uuid;
 
 mod credentials;
 mod pulses;
@@ -39,7 +39,6 @@ const EXECUTABLE: &str = "activity-insights.exe";
 
 const PULSE_API_URL: &str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 const REGISTRATION_URL: &str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
-const UPDATED_EXECUTABLE: &str = ".updated-activity-insights";
 pub const PS_DIR: &str = ".pluralsight";
 const VERSION: usize = 1;
 
@@ -189,15 +188,16 @@ pub fn update_cli(path: &Path) -> Result<(), ActivityInsightsError> {
         .and_then(|req| req.bytes())
         .map_err(|e| ActivityInsightsError::HTTP(BINARY_DISTRIBUTION.to_string(), e))?;
 
-    let new_binary = path.join(format!("{}-{}", UPDATED_EXECUTABLE, Uuid::new_v4()));
+    let new_binary = NamedTempFile::new()
+        .map_err(|e| ActivityInsightsError::IO(PathBuf::from("temp-file"), e))?;
     let old_binary = path.join(EXECUTABLE);
 
-    let file = create_executable_file(&new_binary)
-        .map_err(|e| ActivityInsightsError::IO(new_binary.clone(), e))?;
+    let file = create_executable_file(&new_binary.path())
+        .map_err(|e| ActivityInsightsError::IO(new_binary.path().to_path_buf(), e))?;
     let mut writer = BufWriter::new(file);
     writer
         .write(&download)
-        .map_err(|e| ActivityInsightsError::IO(new_binary.clone(), e))?;
+        .map_err(|e| ActivityInsightsError::IO(new_binary.path().to_path_buf(), e))?;
     drop(writer);
 
     fs::rename(&new_binary, &old_binary)

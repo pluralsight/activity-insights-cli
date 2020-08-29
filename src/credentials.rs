@@ -5,13 +5,13 @@ use std::{
     fs::{self, File, OpenOptions},
     path::{Path, PathBuf},
 };
+use tempfile::NamedTempFile;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{ActivityInsightsError, PS_DIR};
 
 const CRED_FILE_NAME: &str = "credentials.yaml";
-const UPDATE_FILE_NAME: &str = ".updated.credentials.yaml";
 const LOCK_FILE_NAME: &str = "credentials.yaml.lock";
 
 #[derive(Error, Debug)]
@@ -84,8 +84,9 @@ impl Credentials {
         self.location.join(CRED_FILE_NAME)
     }
 
-    fn ephemeral_update_path(&self) -> PathBuf {
-        self.location.join(UPDATE_FILE_NAME)
+    fn ephemeral_update_file(&self) -> Result<NamedTempFile, ActivityInsightsError> {
+        NamedTempFile::new_in(&self.location)
+            .map_err(|e| ActivityInsightsError::IO(self.location.to_path_buf(), e))
     }
 
     fn lock_file_path(&self) -> PathBuf {
@@ -168,15 +169,16 @@ impl CredentialsGuard {
     }
 
     fn update(&self, creds: &Credentials) -> Result<(), ActivityInsightsError> {
-        let ephemeral_update_path = creds.ephemeral_update_path();
+        let ephemeral_update_file = creds.ephemeral_update_file()?;
         let credentials_file = creds.creds_file_path();
         fs::write(
-            &ephemeral_update_path,
+            &ephemeral_update_file,
             serde_yaml::to_vec(creds).map_err(CredentialsError::from)?,
         )
-        .map_err(|e| ActivityInsightsError::IO(ephemeral_update_path.clone(), e))?;
-        fs::rename(&ephemeral_update_path, &credentials_file)
-            .map_err(|e| ActivityInsightsError::IO(ephemeral_update_path.clone(), e))?;
+        .map_err(|e| ActivityInsightsError::IO(ephemeral_update_file.path().to_path_buf(), e))?;
+        fs::rename(ephemeral_update_file.path(), &credentials_file).map_err(|e| {
+            ActivityInsightsError::IO(ephemeral_update_file.path().to_path_buf(), e)
+        })?;
 
         Ok(())
     }
