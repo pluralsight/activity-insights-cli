@@ -37,8 +37,6 @@ pub struct Credentials {
     api_token: Option<Uuid>,
     latest_accepted_tos: Option<u8>,
     #[serde(skip)]
-    lock_file: Option<File>,
-    #[serde(skip)]
     location: PathBuf,
 }
 
@@ -86,7 +84,7 @@ impl Credentials {
         self.location.join(CRED_FILE_NAME)
     }
 
-    fn temp_update_file_path(&self) -> PathBuf {
+    fn ephemeral_update_path(&self) -> PathBuf {
         self.location.join(UPDATE_FILE_NAME)
     }
 
@@ -106,64 +104,8 @@ impl Credentials {
         }
     }
 
-    pub fn has_exclusive_lock(&self) -> bool {
-        self.lock_file.is_some()
-    }
-
-    /// Take out an exclusive lock on the credentials lock file. Use this before updating
-    /// credentials on disk. Call realase_lock with the file passed back to release the lock
-    pub fn get_exclusive_lock(&mut self) -> Result<&mut Self, ActivityInsightsError> {
-        if !self.has_exclusive_lock() {
-            let lock_file = self.lock_file_path();
-
-            // We do this so it creates the file if it doesn't exist instead of erroring
-            OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open(&lock_file)
-                .map_err(|e| ActivityInsightsError::IO(lock_file.clone(), e))?;
-
-            let file = File::open(&lock_file)
-                .map_err(|e| ActivityInsightsError::IO(lock_file.clone(), e))?;
-            file.try_lock_exclusive()
-                .map_err(|e| ActivityInsightsError::IO(lock_file.clone(), e))?;
-
-            self.lock_file = Some(file);
-        }
-
-        Ok(self)
-    }
-
-    pub fn release_exclusive_lock(&mut self) -> Result<(), ActivityInsightsError> {
-        if let Some(ref lock_file) = self.lock_file {
-            lock_file
-                .unlock()
-                .map_err(|e| ActivityInsightsError::IO(PathBuf::from("Lock file"), e))?;
-            self.lock_file = None;
-        }
-
-        Ok(())
-    }
-
-    /// Update will only work if the Credentials struct has acquired an exlucsive lock on the file.
-    /// To acquire a lock, use the get_exclusive_lock method. The api_token should be updated
-    /// through the create_api_token method to ensure that an api token has not already been set.
-    fn update(&self) -> Result<(), ActivityInsightsError> {
-        if !self.has_exclusive_lock() {
-            return Err(CredentialsError::NeedsExclusiveLock.into());
-        };
-
-        let temp_update_path = self.temp_update_file_path();
-
-        fs::write(
-            &temp_update_path,
-            serde_yaml::to_vec(self).map_err(CredentialsError::from)?,
-        )
-        .map_err(|e| ActivityInsightsError::IO(temp_update_path.clone(), e))?;
-        fs::rename(&temp_update_path, &self.creds_file_path())
-            .map_err(|e| ActivityInsightsError::IO(temp_update_path.clone(), e))?;
-
-        Ok(())
+    pub fn lock(&mut self) -> Result<CredentialsGuard, ActivityInsightsError> {
+        CredentialsGuard::new(&self.lock_file_path())
     }
 
     /// create_api_token only adds an api token if one is not already there. This prevents the user
@@ -175,55 +117,67 @@ impl Credentials {
             return Err(CredentialsError::HasApiToken.into());
         }
 
-        self.get_exclusive_lock()?;
-
-        let fresh_creds = match self.fetch_latest() {
-            Ok(creds) => creds,
-            Err(e) => {
-                self.release_exclusive_lock()?;
-                return Err(e);
-            }
-        };
+        let lock = self.lock()?;
+        let mut fresh_creds = self.fetch_latest()?;
 
         if fresh_creds.api_token().is_some() {
-            self.release_exclusive_lock()?;
             return Err(CredentialsError::HasApiToken.into());
         }
 
-        self.latest_accepted_tos = fresh_creds.latest_accepted_tos;
         let new_token = Uuid::new_v4();
-        self.api_token = Some(new_token);
+        fresh_creds.api_token = Some(new_token);
 
-        if let Err(e) = self.update() {
-            self.release_exclusive_lock()?;
+        if let Err(e) = lock.update(&fresh_creds) {
             return Err(e);
         }
-
-        self.release_exclusive_lock()?;
 
         Ok(new_token)
     }
 
     pub fn accept_tos(&mut self, tos_version: u8) -> Result<(), ActivityInsightsError> {
-        self.get_exclusive_lock()?;
+        let lock = self.lock()?;
 
-        let fresh_creds = match self.fetch_latest() {
-            Ok(creds) => creds,
-            Err(e) => {
-                self.release_exclusive_lock()?;
-                return Err(e);
-            }
-        };
+        let mut fresh_creds = self.fetch_latest()?;
+        fresh_creds.latest_accepted_tos = Some(tos_version);
 
-        self.api_token = fresh_creds.api_token;
-        self.latest_accepted_tos = Some(tos_version);
+        lock.update(&fresh_creds)?;
 
-        if let Err(e) = self.update() {
-            self.release_exclusive_lock()?;
-            return Err(e);
-        }
+        Ok(())
+    }
+}
 
-        self.release_exclusive_lock()?;
+/// Responsible for controlling the lock on the Credentials file and updating the credentials to disk. Lock is released when it goes out of
+/// scope
+#[derive(Debug)]
+pub struct CredentialsGuard {
+    lock_file: File,
+}
+
+impl CredentialsGuard {
+    pub fn new(path: &Path) -> Result<Self, ActivityInsightsError> {
+        let lock_file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&path)
+            .map_err(|e| ActivityInsightsError::IO(path.to_path_buf(), e))?;
+
+        lock_file
+            .try_lock_exclusive()
+            .map_err(|e| ActivityInsightsError::IO(path.to_path_buf(), e))?;
+        Ok(CredentialsGuard { lock_file })
+    }
+
+    fn update(&self, creds: &Credentials) -> Result<(), ActivityInsightsError> {
+        let ephemeral_update_path = creds.ephemeral_update_path();
+        let credentials_file = creds.creds_file_path();
+        fs::write(
+            &ephemeral_update_path,
+            serde_yaml::to_vec(creds).map_err(CredentialsError::from)?,
+        )
+        .map_err(|e| ActivityInsightsError::IO(ephemeral_update_path.clone(), e))?;
+        fs::rename(&ephemeral_update_path, &credentials_file)
+            .map_err(|e| ActivityInsightsError::IO(ephemeral_update_path.clone(), e))?;
+
         Ok(())
     }
 }
@@ -252,7 +206,7 @@ mod tests {
         let mut creds_with_lock = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
         let mut creds_without_lock = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
 
-        creds_with_lock.get_exclusive_lock().unwrap();
+        let _lock = creds_with_lock.lock().unwrap();
         match creds_without_lock.create_api_token() {
             Err(ActivityInsightsError::IO(_, e)) => {
                 assert_eq!(e.kind(), std::io::ErrorKind::WouldBlock)
@@ -267,10 +221,9 @@ mod tests {
 
         let mut api_creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
         api_creds.create_api_token().unwrap();
-        assert!(api_creds.lock_file.is_none());
 
         let mut creds = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
-        creds.get_exclusive_lock().unwrap();
+        creds.lock().unwrap();
     }
 
     #[test]
@@ -312,10 +265,10 @@ mod tests {
         let fake_dir = tempdir().unwrap();
 
         let mut creds1 = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
-        creds1.get_exclusive_lock().unwrap();
-        drop(creds1);
+        let lock = creds1.lock().unwrap();
+        drop(lock);
 
         let mut creds2 = Credentials::fetch_from_dir(fake_dir.path()).unwrap();
-        creds2.get_exclusive_lock().unwrap();
+        creds2.lock().unwrap();
     }
 }
