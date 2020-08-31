@@ -40,7 +40,7 @@ const EXECUTABLE: &str = "activity-insights.exe";
 const PULSE_API_URL: &str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 const REGISTRATION_URL: &str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
 pub const PS_DIR: &str = ".pluralsight";
-const VERSION: usize = 1;
+const VERSION: usize = include!("../cli-version");
 
 #[derive(Debug, Error)]
 pub enum ActivityInsightsError {

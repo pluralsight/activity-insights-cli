@@ -25,8 +25,8 @@ use activity_insights_cli::{
 const BAD_REGISTRATION_URL: &str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
 const DASHBOARD_URL: &str = "https://app.pluralsight.com/activity-insights-beta/";
 const LOG_FILE: &str = "activity-insights.logs";
-const TOS_VERSION: u8 = 1;
-const TOS: &str = "By syncing your text editor, you agree to share information from your text editor to enable us to make learning recommendations based on your programming activity. Pluralsight gathers the time of day and duration of each coding session, the language(s) you use to code, and the libraries in your code. We do not copy your source code. If you do not want to share this data with Pluralsight, please do not sync your text editor. Use of this service and all data gathered is subject to Pluralsight's Terms of Use and Privacy Policy.";
+const TOS_VERSION: u8 = include!("../../terms-of-service-version");
+const TOS: &str = include_str!("../../terms-of-service");
 const NOT_ACCEPTED_TOS_EXIT_CODE: i32 = 100;
 
 fn main() {
