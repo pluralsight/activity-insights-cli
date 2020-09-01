@@ -19,15 +19,8 @@ use std::{
 };
 
 use activity_insights_cli::{
-    build_pulses, maybe_update, open_browser, register, send_pulses, Credentials, PS_DIR,
+    build_pulses, constants, maybe_update, open_browser, register, send_pulses, Credentials,
 };
-
-const BAD_REGISTRATION_URL: &str =  "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/activity-insights-beta?error=unsuccessful-registration";
-const DASHBOARD_URL: &str = "https://app.pluralsight.com/activity-insights-beta/";
-const LOG_FILE: &str = "activity-insights.logs";
-const TOS_VERSION: u8 = include!("../../terms-of-service-version");
-const TOS: &str = include_str!("../../terms-of-service");
-const NOT_ACCEPTED_TOS_EXIT_CODE: i32 = 100;
 
 fn main() {
     create_logger();
@@ -59,8 +52,8 @@ fn create_logger() {
         eprintln!("Error finding home dir");
         exit(10);
     });
-    log_dir.push(PS_DIR);
-    log_dir.push(LOG_FILE);
+    log_dir.push(constants::PS_DIR);
+    log_dir.push(constants::LOG_FILE);
 
     let rotation_policy = CompoundPolicy::new(
         Box::new(SizeTrigger::new(10_000)),
@@ -94,9 +87,9 @@ fn check_tos() {
         exit(101)
     });
 
-    if !creds.has_accepted_latest(TOS_VERSION) {
-        println!("{}", TOS);
-        exit(NOT_ACCEPTED_TOS_EXIT_CODE)
+    if !creds.has_accepted_latest(constants::TOS_VERSION) {
+        println!("{}", constants::TOS);
+        exit(constants::NOT_ACCEPTED_TOS_EXIT_CODE)
     }
 }
 
@@ -104,7 +97,7 @@ fn register_command() {
     info!("Starting register command");
     if let Err(e) = register() {
         error!("Error on registration: {}", e);
-        if let Err(e) = open_browser(BAD_REGISTRATION_URL) {
+        if let Err(e) = open_browser(constants::BAD_REGISTRATION_URL) {
             error!(
                 "Error trying to let the user know a registration went bad: {}",
                 e
@@ -116,7 +109,7 @@ fn register_command() {
 
 fn dashboard_command() {
     info!("Starting dashboard command");
-    if let Err(e) = open_browser(DASHBOARD_URL) {
+    if let Err(e) = open_browser(constants::DASHBOARD_URL) {
         error!("Error trying to show the user their dashboard: {}", e);
         exit(40);
     } else {
@@ -158,10 +151,12 @@ fn accept_tos_command() {
         exit(101)
     });
 
-    creds.accept_tos(TOS_VERSION).unwrap_or_else(|e| {
-        error!("Error accepting TOS {}: {}", TOS_VERSION, e);
-        exit(102)
-    });
+    creds
+        .accept_tos(constants::TOS_VERSION)
+        .unwrap_or_else(|e| {
+            error!("Error accepting TOS {}: {}", constants::TOS_VERSION, e);
+            exit(102)
+        });
 }
 
 /*

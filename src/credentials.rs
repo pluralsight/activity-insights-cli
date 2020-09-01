@@ -9,10 +9,7 @@ use tempfile::NamedTempFile;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{ActivityInsightsError, PS_DIR};
-
-const CRED_FILE_NAME: &str = "credentials.yaml";
-const LOCK_FILE_NAME: &str = "credentials.yaml.lock";
+use crate::{constants, ActivityInsightsError};
 
 #[derive(Error, Debug)]
 pub enum CredentialsError {
@@ -43,7 +40,7 @@ pub struct Credentials {
 impl Credentials {
     pub fn fetch() -> Result<Self, ActivityInsightsError> {
         let creds_dir = dirs::home_dir()
-            .map(|dir| dir.join(PS_DIR))
+            .map(|dir| dir.join(constants::PS_DIR))
             .ok_or_else(|| {
                 ActivityInsightsError::Other(String::from("Can't find the home directory"))
             })?;
@@ -52,7 +49,7 @@ impl Credentials {
     }
 
     fn fetch_from_dir(dir: &Path) -> Result<Self, ActivityInsightsError> {
-        let path = dir.join(CRED_FILE_NAME);
+        let path = dir.join(constants::CRED_FILE_NAME);
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -81,7 +78,7 @@ impl Credentials {
     }
 
     fn creds_file_path(&self) -> PathBuf {
-        self.location.join(CRED_FILE_NAME)
+        self.location.join(constants::CRED_FILE_NAME)
     }
 
     fn ephemeral_update_file(&self) -> Result<NamedTempFile, ActivityInsightsError> {
@@ -90,7 +87,7 @@ impl Credentials {
     }
 
     fn lock_file_path(&self) -> PathBuf {
-        self.location.join(LOCK_FILE_NAME)
+        self.location.join(constants::LOCK_FILE_NAME)
     }
 
     pub fn api_token(&self) -> &Option<Uuid> {

@@ -14,33 +14,12 @@ use std::{
 use tempfile::NamedTempFile;
 use thiserror::Error;
 
+pub mod constants;
 mod credentials;
 mod pulses;
 
 pub use credentials::{Credentials, CredentialsError};
 use pulses::{Pulse, PulseFromEditor};
-
-#[cfg(target_os = "linux")]
-const BINARY_DISTRIBUTION: &str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/linux/ps-time";
-#[cfg(target_os = "macos")]
-const BINARY_DISTRIBUTION: &str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/ps-time";
-#[cfg(target_os = "windows")]
-const BINARY_DISTRIBUTION: &str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/windows/ps-time.exe";
-
-const CLI_VERSION_URL: &str = "https://app.pluralsight.com/wsd/api/ps-time/version";
-
-#[cfg(unix)]
-const EXECUTABLE: &str = "activity-insights";
-#[cfg(not(unix))]
-const EXECUTABLE: &str = "activity-insights.exe";
-
-const PULSE_API_URL: &str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
-const REGISTRATION_URL: &str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
-pub const PS_DIR: &str = ".pluralsight";
-const VERSION: usize = include!("../cli-version");
 
 #[derive(Debug, Error)]
 pub enum ActivityInsightsError {
@@ -98,11 +77,13 @@ pub fn send_pulses(pulses: &[Pulse]) -> Result<StatusCode, ActivityInsightsError
     match creds.api_token() {
         Some(token) => {
             let res = client
-                .post(PULSE_API_URL)
+                .post(constants::PULSE_API_URL)
                 .bearer_auth(token)
                 .json(&PulseRequest::new(pulses))
                 .send()
-                .map_err(|e| ActivityInsightsError::HTTP(PULSE_API_URL.to_string(), e))?;
+                .map_err(|e| {
+                    ActivityInsightsError::HTTP(constants::PULSE_API_URL.to_string(), e)
+                })?;
             Ok(res.status())
         }
         None => Err(ActivityInsightsError::Other(String::from(
@@ -118,7 +99,7 @@ pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, ActivityInsightsEr
     log::info!(
         "{:?}, {} {:?}",
         Client::new(),
-        PULSE_API_URL,
+        constants::PULSE_API_URL,
         PulseRequest::new(pulses)
     );
     Ok(StatusCode::default())
@@ -146,22 +127,23 @@ pub fn register() -> Result<(), ActivityInsightsError> {
         None => creds.create_api_token()?,
     };
 
-    open_browser(&format!("{}?apiToken={}", REGISTRATION_URL, api_token))
-        .map_err(|e| ActivityInsightsError::IO(PathBuf::from("Opening browser..."), e))?;
+    open_browser(&format!(
+        "{}?apiToken={}",
+        constants::REGISTRATION_URL,
+        api_token
+    ))
+    .map_err(|e| ActivityInsightsError::IO(PathBuf::from("Opening browser..."), e))?;
     Ok(())
 }
 
 pub fn maybe_update() -> Result<(), ActivityInsightsError> {
-    match check_for_updates(VERSION) {
+    match check_for_updates(constants::VERSION) {
         Ok(true) => {
-            let update_location =
-                dirs::home_dir()
-                    .map(|dir| dir.join(PS_DIR))
-                    .ok_or_else(|| {
-                        ActivityInsightsError::Other(String::from(
-                            "Error getting the home directory",
-                        ))
-                    })?;
+            let update_location = dirs::home_dir()
+                .map(|dir| dir.join(constants::PS_DIR))
+                .ok_or_else(|| {
+                    ActivityInsightsError::Other(String::from("Error getting the home directory"))
+                })?;
 
             update_cli(&update_location)
         }
@@ -171,8 +153,8 @@ pub fn maybe_update() -> Result<(), ActivityInsightsError> {
 }
 
 pub fn check_for_updates(current_version: usize) -> Result<bool, ActivityInsightsError> {
-    let resp = blocking::get(CLI_VERSION_URL)
-        .map_err(|e| ActivityInsightsError::HTTP(CLI_VERSION_URL.to_string(), e))?;
+    let resp = blocking::get(constants::CLI_VERSION_URL)
+        .map_err(|e| ActivityInsightsError::HTTP(constants::CLI_VERSION_URL.to_string(), e))?;
     let resp: VersionResponse = serde_json::from_reader(resp)?;
 
     if resp.version > current_version {
@@ -184,13 +166,13 @@ pub fn check_for_updates(current_version: usize) -> Result<bool, ActivityInsight
 }
 
 pub fn update_cli(path: &Path) -> Result<(), ActivityInsightsError> {
-    let download = blocking::get(BINARY_DISTRIBUTION)
+    let download = blocking::get(constants::BINARY_DISTRIBUTION)
         .and_then(|req| req.bytes())
-        .map_err(|e| ActivityInsightsError::HTTP(BINARY_DISTRIBUTION.to_string(), e))?;
+        .map_err(|e| ActivityInsightsError::HTTP(constants::BINARY_DISTRIBUTION.to_string(), e))?;
 
     let new_binary = NamedTempFile::new()
         .map_err(|e| ActivityInsightsError::IO(PathBuf::from("temp-file"), e))?;
-    let old_binary = path.join(EXECUTABLE);
+    let old_binary = path.join(constants::EXECUTABLE);
 
     let file = create_executable_file(&new_binary.path())
         .map_err(|e| ActivityInsightsError::IO(new_binary.path().to_path_buf(), e))?;
