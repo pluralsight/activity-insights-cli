@@ -72,6 +72,9 @@ pub fn build_pulses(content: &str) -> Result<Vec<Pulse>, serde_json::error::Erro
 
 #[cfg(not(test))]
 pub fn send_pulses(pulses: &[Pulse]) -> Result<StatusCode, ActivityInsightsError> {
+    if pulses.is_empty() {
+        return Ok(StatusCode::from_u16(204).unwrap());
+    };
     let client = Client::new();
     let creds = Credentials::fetch()?;
     match creds.api_token() {
