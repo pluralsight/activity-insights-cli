@@ -60,7 +60,6 @@ Razor
 Redis
 Reflection
 RegularExpressions
-Resources
 RestSharp
 Retyped
 Serilog
