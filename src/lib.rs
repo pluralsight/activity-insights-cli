@@ -75,6 +75,7 @@ pub fn send_pulses(pulses: &[Pulse]) -> Result<StatusCode, ActivityInsightsError
     if pulses.is_empty() {
         return Ok(StatusCode::from_u16(204).unwrap());
     };
+
     let client = Client::new();
     let creds = Credentials::fetch()?;
     match creds.api_token() {
@@ -140,38 +141,34 @@ pub fn register() -> Result<(), ActivityInsightsError> {
 }
 
 pub fn maybe_update() -> Result<(), ActivityInsightsError> {
-    match check_for_updates(constants::VERSION) {
-        Ok(true) => {
-            let update_location = dirs::home_dir()
-                .map(|dir| dir.join(constants::PS_DIR))
-                .ok_or_else(|| {
-                    ActivityInsightsError::Other(String::from("Error getting the home directory"))
-                })?;
+    let latest = get_latest_version()?;
+    if latest > constants::VERSION {
+        let update_location = dirs::home_dir()
+            .map(|dir| dir.join(constants::PS_DIR))
+            .ok_or_else(|| {
+                ActivityInsightsError::Other(String::from("Error getting the home directory"))
+            })?;
 
-            update_cli(&update_location)
-        }
-        Ok(false) => Ok(()),
-        Err(e) => Err(e),
+        update_cli(&update_location, latest)?;
     }
+    Ok(())
 }
 
-pub fn check_for_updates(current_version: usize) -> Result<bool, ActivityInsightsError> {
+pub fn get_latest_version() -> Result<usize, ActivityInsightsError> {
     let resp = blocking::get(constants::CLI_VERSION_URL)
         .map_err(|e| ActivityInsightsError::HTTP(constants::CLI_VERSION_URL.to_string(), e))?;
     let resp: VersionResponse = serde_json::from_reader(resp)?;
 
-    if resp.version > current_version {
-        info!("Updating cli to version {}...", resp.version);
-        Ok(true)
-    } else {
-        Ok(false)
-    }
+    Ok(resp.version)
 }
 
-pub fn update_cli(path: &Path) -> Result<(), ActivityInsightsError> {
-    let download = blocking::get(constants::BINARY_DISTRIBUTION)
+pub fn update_cli(path: &Path, version: usize) -> Result<(), ActivityInsightsError> {
+    info!("Updating cli to version {}...", version);
+
+    let download_url = format!("{}-{}", constants::BINARY_DISTRIBUTION, version);
+    let download = blocking::get(&download_url)
         .and_then(|req| req.bytes())
-        .map_err(|e| ActivityInsightsError::HTTP(constants::BINARY_DISTRIBUTION.to_string(), e))?;
+        .map_err(|e| ActivityInsightsError::HTTP(download_url, e))?;
 
     let new_binary = NamedTempFile::new()
         .map_err(|e| ActivityInsightsError::IO(PathBuf::from("temp-file"), e))?;
@@ -213,10 +210,12 @@ mod tests {
     use super::*;
     use tempfile;
 
+    const FAKE_VERSION: usize = 1;
+
     #[test]
     fn updating() {
         let fake_dir = tempfile::tempdir().unwrap();
-        update_cli(fake_dir.path()).unwrap();
+        update_cli(fake_dir.path(), FAKE_VERSION).unwrap();
 
         let entries: Vec<_> = fs::read_dir(fake_dir.path())
             .unwrap()
@@ -235,16 +234,9 @@ mod tests {
     }
 
     #[test]
-    fn check_update_required() {
+    fn get_latest() {
         let very_old_version = 0;
-        let should_update = check_for_updates(very_old_version).unwrap();
-        assert_eq!(should_update, true)
-    }
-
-    #[test]
-    fn check_update_not_required() {
-        let very_new_version = 10_000_000;
-        let should_update = check_for_updates(very_new_version).unwrap();
-        assert_eq!(should_update, false)
+        let latest = get_latest_version().unwrap();
+        assert!(latest > very_old_version)
     }
 }

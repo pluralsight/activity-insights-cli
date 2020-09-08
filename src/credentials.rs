@@ -32,7 +32,7 @@ pub enum CredentialsError {
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Credentials {
     api_token: Option<Uuid>,
-    latest_accepted_tos: Option<u8>,
+    latest_accepted_tos: Option<usize>,
     #[serde(skip)]
     location: PathBuf,
 }
@@ -94,7 +94,7 @@ impl Credentials {
         &self.api_token
     }
 
-    pub fn has_accepted_latest(&self, latest_version: u8) -> bool {
+    pub fn has_accepted_latest(&self, latest_version: usize) -> bool {
         if let Some(val) = self.latest_accepted_tos {
             val >= latest_version
         } else {
@@ -132,7 +132,7 @@ impl Credentials {
         Ok(new_token)
     }
 
-    pub fn accept_tos(&mut self, tos_version: u8) -> Result<(), ActivityInsightsError> {
+    pub fn accept_tos(&mut self, tos_version: usize) -> Result<(), ActivityInsightsError> {
         let lock = self.lock()?;
 
         let mut fresh_creds = self.fetch_latest()?;

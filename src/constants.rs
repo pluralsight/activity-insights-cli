@@ -9,7 +9,7 @@ pub const PS_DIR: &str = ".pluralsight";
 pub const PULSE_API_URL: &str = "https://app.pluralsight.com/wsd/api/ps-time/pulse";
 pub const REGISTRATION_URL: &str = "https://app.pluralsight.com/id?redirectTo=https://app.pluralsight.com/wsd/api/ps-time/register";
 pub const TOS: &str = include_str!("../terms-of-service");
-pub const TOS_VERSION: u8 = include!("../terms-of-service-version");
+pub const TOS_VERSION: usize = include!("../terms-of-service-version");
 pub const VERSION: usize = include!("../cli-version");
 
 #[cfg(target_os = "linux")]
