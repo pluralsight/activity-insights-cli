@@ -14,13 +14,13 @@ pub const VERSION: usize = include!("../cli-version");
 
 #[cfg(target_os = "linux")]
 pub const BINARY_DISTRIBUTION: &str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/linux/ps-time";
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/linux/activity-insights";
 #[cfg(target_os = "macos")]
 pub const BINARY_DISTRIBUTION: &str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/ps-time";
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/activity-insgihts";
 #[cfg(target_os = "windows")]
 pub const BINARY_DISTRIBUTION: &str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/windows/ps-time.exe";
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/windows/activity-insights.exe";
 
 #[cfg(unix)]
 pub const EXECUTABLE: &str = "activity-insights";
