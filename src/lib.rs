@@ -6,7 +6,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
-    fs::{self, File},
+    fs,
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
     process::{Child, Command},
@@ -25,6 +25,9 @@ use pulses::{Pulse, PulseFromEditor};
 pub enum ActivityInsightsError {
     #[error("HTTP Error for request to url: {0}\n{1}")]
     HTTP(String, reqwest::Error),
+
+    #[error("Bad response from request to url: {0}\n{:1}")]
+    BadResponse(String, StatusCode),
 
     #[error("IO Error for location: {0}\n{1}")]
     IO(PathBuf, io::Error),
@@ -96,7 +99,7 @@ pub fn send_pulses(pulses: &[Pulse]) -> Result<StatusCode, ActivityInsightsError
     }
 }
 
-// Don't actually send the pulses for the tests
+// Don't send the pulses for the tests
 #[cfg(test)]
 pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, ActivityInsightsError> {
     // loggging out unused variables here to avoid unused warning
@@ -165,44 +168,63 @@ pub fn get_latest_version() -> Result<usize, ActivityInsightsError> {
 pub fn update_cli(path: &Path, version: usize) -> Result<(), ActivityInsightsError> {
     info!("Updating cli to version {}...", version);
 
-    let download_url = format!("{}-{}", constants::BINARY_DISTRIBUTION, version);
-    let download = blocking::get(&download_url)
-        .and_then(|req| req.bytes())
-        .map_err(|e| ActivityInsightsError::HTTP(download_url, e))?;
+    let download = {
+        let download_url = format!("{}-{}", constants::BINARY_DISTRIBUTION, version);
+        let response = blocking::get(&download_url)
+            .map_err(|e| ActivityInsightsError::HTTP(download_url.to_string(), e))?;
 
-    let new_binary = NamedTempFile::new()
+        match response.status() {
+            StatusCode::OK => match response.bytes() {
+                Ok(bytes) => bytes,
+                Err(e) => return Err(ActivityInsightsError::HTTP(download_url, e)),
+            },
+            other => return Err(ActivityInsightsError::BadResponse(download_url, other)),
+        }
+    };
+
+    let ephemeral_update_file = NamedTempFile::new()
         .map_err(|e| ActivityInsightsError::IO(PathBuf::from("temp-file"), e))?;
-    let old_binary = path.join(constants::EXECUTABLE);
 
-    let file = create_executable_file(&new_binary.path())
-        .map_err(|e| ActivityInsightsError::IO(new_binary.path().to_path_buf(), e))?;
-    let mut writer = BufWriter::new(file);
-    writer
-        .write(&download)
-        .map_err(|e| ActivityInsightsError::IO(new_binary.path().to_path_buf(), e))?;
-    drop(writer);
+    let mut writer = BufWriter::new(&ephemeral_update_file);
+    if let Err(e) = writer.write(&download) {
+        return Err(ActivityInsightsError::IO(
+            ephemeral_update_file.path().to_path_buf(),
+            e,
+        ));
+    }
 
-    fs::rename(&new_binary, &old_binary)
-        .map_err(|e| ActivityInsightsError::IO(old_binary.clone(), e))?;
+    let permanent_executable_path = path.join(constants::EXECUTABLE);
+    if let Err(e) = fs::rename(&ephemeral_update_file, &permanent_executable_path) {
+        return Err(ActivityInsightsError::IO(
+            permanent_executable_path.clone(),
+            e,
+        ));
+    }
+
+    #[cfg(unix)]
+    if let Err(e) = give_executable_permissions(&permanent_executable_path) {
+        // If we don't remove the binary, then the next time an editor goes to run the binary it
+        // will get a permissions error. Removing the binary will cause the editor to try and
+        // reinstall the binary and hopefully it goes better on the next attempt.
+        if let Err(e) = fs::remove_file(&permanent_executable_path) {
+            return Err(ActivityInsightsError::IO(
+                permanent_executable_path.to_path_buf(),
+                e,
+            ));
+        }
+        return Err(ActivityInsightsError::IO(permanent_executable_path, e));
+    }
 
     Ok(())
 }
 
-#[cfg(not(unix))]
-fn create_executable_file(path: &Path) -> Result<File, io::Error> {
-    File::create(&path)
-}
-
 #[cfg(unix)]
-fn create_executable_file(path: &Path) -> Result<File, io::Error> {
-    use std::fs::OpenOptions;
-    use std::os::unix::fs::OpenOptionsExt;
-    OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .mode(0o777)
-        .open(path)
+fn give_executable_permissions(path: &Path) -> Result<(), io::Error> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let new_permissions = fs::Permissions::from_mode(0o777);
+    fs::set_permissions(path, new_permissions).unwrap();
+    Ok(())
 }
 
 #[cfg(test)]
@@ -230,7 +252,21 @@ mod tests {
         assert_eq!(filename, String::from("activity-insights"));
 
         #[cfg(not(unix))]
-        assert_eq!(filename, String::from("activity-insights"));
+        assert_eq!(filename, String::from("activity-insights.exe"));
+
+        #[cfg(unix)]
+        {
+            use std::fs::Permissions;
+            use std::os::unix::fs::PermissionsExt;
+
+            let file = fs::File::open(new_binary).unwrap();
+            let permissions = file.metadata().unwrap().permissions();
+
+            // The first few bits represent data about the file, which is why its 0o100777 and not
+            // 0o777
+            let expected_permissions = Permissions::from_mode(0o100777);
+            assert_eq!(permissions, expected_permissions);
+        }
     }
 
     #[test]

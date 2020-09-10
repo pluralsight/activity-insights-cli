@@ -17,7 +17,7 @@ pub const BINARY_DISTRIBUTION: &str =
     "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/linux/activity-insights";
 #[cfg(target_os = "macos")]
 pub const BINARY_DISTRIBUTION: &str =
-    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/activity-insgihts";
+    "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/activity-insights";
 #[cfg(target_os = "windows")]
 pub const BINARY_DISTRIBUTION: &str =
     "https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/windows/activity-insights.exe";
