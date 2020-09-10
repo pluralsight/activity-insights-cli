@@ -28,6 +28,7 @@ fn main() {
 
     match env::args().nth(1) {
         Some(v) if v.as_str() == "accept_tos" => accept_tos_command(),
+        Some(v) if v.as_str() == "version" => println!("{}", constants::VERSION),
         _ => {
             check_tos();
             match env::args().nth(1) {
