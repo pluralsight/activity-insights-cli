@@ -24,6 +24,9 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Test Binary Curl
+        run: curl -Lo binary-test https://ps-cdn.s3-us-west-2.amazonaws.com/learner-workflow/ps-time/mac/activity-insights-1
+
       - name: Test
         uses: actions-rs/cargo@v1
         with:
