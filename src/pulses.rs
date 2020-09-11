@@ -118,7 +118,7 @@ mod tests {
             pulse_type: String::from("typing"),
             date: String::from("2020-07-27T16:48:33.238+00:00"),
             programming_language: String::from("Other"),
-            editor: String::from("emacs 😭"),
+            editor: String::from("emacs :rip:"),
             tags,
         };
         assert_eq!(pulse, expected);
