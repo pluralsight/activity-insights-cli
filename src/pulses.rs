@@ -104,7 +104,7 @@ mod tests {
               "filePath": "{filepath}",
               "eventType": "typing",
               "eventDate": 1595868513238,
-              "editor": "emacs 😭"
+              "editor": "emacs :rip:"
             }
         "#;
         let raw_pulse = raw_pulse.replace("{filepath}", fake_file.path().to_str().unwrap());
