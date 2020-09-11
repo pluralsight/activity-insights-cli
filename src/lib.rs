@@ -228,6 +228,15 @@ fn give_executable_permissions(path: &Path) -> Result<(), io::Error> {
 }
 
 #[cfg(test)]
+#[ctor::ctor]
+fn init() {
+    let _ = env_logger::builder()
+        .is_test(true)
+        .filter_level(log::LevelFilter::Debug)
+        .try_init();
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use tempfile;
