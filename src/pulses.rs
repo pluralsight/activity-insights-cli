@@ -100,13 +100,10 @@ mod tests {
         write!(fake_file, "{}", fake_content).unwrap();
 
         let raw_pulse = r#"{"filePath": "{filepath}","eventType": "typing","eventDate": 1595868513238,"editor": "emacs :rip:"}"#;
-        println!("PRE-FILLED PULSE: '{}'", raw_pulse);
         let raw_pulse = raw_pulse.replace("{filepath}", fake_file.path().to_str().unwrap());
 
         #[cfg(windows)]
         let raw_pulse = raw_pulse.replace(r#"\"#, r#"\\"#); // Otherwise windows backslashes in file paths are interpreted as escape sequences
-
-        println!("PULSE: '{}'", raw_pulse);
 
         let editor_pulse: PulseFromEditor =
             serde_json::from_str(&raw_pulse).expect("Failed deserializing editor pulse");
