@@ -208,7 +208,11 @@ mod tests {
         let _lock = creds_with_lock.lock().unwrap();
         match creds_without_lock.create_api_token() {
             Err(ActivityInsightsError::IO(_, e)) => {
-                assert_eq!(e.kind(), std::io::ErrorKind::WouldBlock)
+                #[cfg(unix)]
+                assert_eq!(e.kind(), std::io::ErrorKind::WouldBlock);
+
+                #[cfg(not(unix))]
+                assert_eq!(e.kind(), std::io::ErrorKind::Other);
             }
             _ => assert!(false),
         }
