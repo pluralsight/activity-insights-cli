@@ -169,7 +169,8 @@ pub fn update_cli(path: &Path, version: usize) -> Result<(), ActivityInsightsErr
     info!("Updating cli to version {}...", version);
 
     let download = {
-        let download_url = format!("{}-{}", constants::BINARY_DISTRIBUTION, version);
+        let download_url = get_download_url(version);
+
         let response = blocking::get(&download_url)
             .map_err(|e| ActivityInsightsError::HTTP(download_url.to_string(), e))?;
 
@@ -225,6 +226,33 @@ fn give_executable_permissions(path: &Path) -> Result<(), io::Error> {
     let new_permissions = fs::Permissions::from_mode(0o777);
     fs::set_permissions(path, new_permissions).unwrap();
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn get_download_url(version: usize) -> String {
+    format!(
+        "{}linux/activity-insights-{}",
+        constants::BASE_BINARY_DISTRIBUTION,
+        version
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn get_download_url(version: usize) -> String {
+    format!(
+        "{}mac/activity-insights-{}",
+        constants::BASE_BINARY_DISTRIBUTION,
+        version
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn get_download_url(version: usize) -> String {
+    format!(
+        "{}windows/activity-insights-{}.exe",
+        constants::BASE_BINARY_DISTRIBUTION,
+        version
+    )
 }
 
 #[cfg(test)]
