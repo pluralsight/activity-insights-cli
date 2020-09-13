@@ -47,9 +47,11 @@ jobs:
           args: --release
 
       - name: Rename Binary
+        #if: ${{ matrix.os != "windows" }}
         run: |
           cp target/release/activity-insights activity-insights-$CLI_VERSION${{ matrix.extension }}
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
+        shell: bash
 
       - name: Check Binary Rename
         run: ls
