@@ -17,6 +17,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Set Version
+        run: echo "::set-env name=CLI_VERSION::$(cat cli-version)"
+
+      - name: Log Version
+        run: echo "$CLI_VERSION"
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
