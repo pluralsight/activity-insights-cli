@@ -48,7 +48,7 @@ jobs:
 
       - name: Rename Binary
         run: |
-          cp target/release/activity-insights activity-insights-$CLI_VERISON${{ matrix.extension }}
+          cp target/release/activity-insights activity-insights-$CLI_VERSION${{ matrix.extension }}
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
 
       - name: Check Binary Rename
