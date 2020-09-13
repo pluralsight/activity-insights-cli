@@ -10,8 +10,13 @@ jobs:
         matrix:
           include:
             - os: ubuntu-latest
+              extension: ""
+
             - os: macos-latest
+              extension: ""
+
             - os: windows-latest
+              extension: ".exe"
 
     steps:
       - name: Checkout
@@ -40,3 +45,10 @@ jobs:
         with:
           command: build
           args: --release
+
+      - name: Rename Binary
+          run: cp target/release/activity-insights activity-insights-$(CLI_VERISON)${{ matrix.extension }}
+          run: cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
+
+      - name: Check Binary Rename
+          run: ls
