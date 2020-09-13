@@ -1,4 +1,8 @@
-on: push
+on:
+  push:
+    paths:
+    - 'cli-version'
+
 
 name: Deploy to s3
 
@@ -25,10 +29,7 @@ jobs:
       - name: Set Version
         run: echo "::set-env name=CLI_VERSION::$(cat cli-version)"
 
-      - name: Log Version
-        run: echo "$CLI_VERSION"
-
-      - name: Install Rust toolchain
+      - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -47,11 +48,7 @@ jobs:
           args: --release
 
       - name: Rename Binary
-        #if: ${{ matrix.os != "windows" }}
         run: |
           cp target/release/activity-insights activity-insights-$CLI_VERSION${{ matrix.extension }}
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
         shell: bash
-
-      - name: Check Binary Rename
-        run: ls
