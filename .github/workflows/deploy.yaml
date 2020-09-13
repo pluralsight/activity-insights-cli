@@ -47,8 +47,9 @@ jobs:
           args: --release
 
       - name: Rename Binary
-        run: cp target/release/activity-insights activity-insights-$(CLI_VERISON)${{ matrix.extension }}
-        # run: cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
+        run: |
+          cp target/release/activity-insights activity-insights-$CLI_VERISON${{ matrix.extension }}
+          cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
 
       - name: Check Binary Rename
         run: ls
