@@ -183,7 +183,7 @@ pub fn update_cli(path: &Path, version: usize) -> Result<(), ActivityInsightsErr
         }
     };
 
-    let ephemeral_update_file = NamedTempFile::new()
+    let ephemeral_update_file = NamedTempFile::new_in(path)
         .map_err(|e| ActivityInsightsError::IO(PathBuf::from("temp-file"), e))?;
 
     let mut writer = BufWriter::new(&ephemeral_update_file);
