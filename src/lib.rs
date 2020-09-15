@@ -195,6 +195,17 @@ pub fn update_cli(path: &Path, version: usize) -> Result<(), ActivityInsightsErr
     }
 
     let permanent_executable_path = path.join(constants::EXECUTABLE);
+
+    #[cfg(not(unix))]
+    // Windows will not let us delete the executable as it is running, so we need to rename
+    // the currently running file and then rename the newly downloaded version
+    if let Err(e) = fs::rename(&permanent_executable_path, path.join("old-version")) {
+        return Err(ActivityInsightsError::IO(
+            permanent_executable_path.clone(),
+            e,
+        ));
+    }
+
     if let Err(e) = fs::rename(&ephemeral_update_file, &permanent_executable_path) {
         return Err(ActivityInsightsError::IO(
             permanent_executable_path.clone(),
@@ -271,6 +282,7 @@ mod tests {
 
     const FAKE_VERSION: usize = 1;
 
+    #[cfg(unix)]
     #[test]
     fn updating() {
         let fake_dir = tempfile::tempdir().unwrap();
@@ -280,30 +292,50 @@ mod tests {
             .unwrap()
             .map(|x| x.unwrap())
             .collect();
+
         assert_eq!(1, entries.len());
 
         let new_binary = entries[0].path();
         let filename = new_binary.file_name().unwrap().to_str().unwrap();
 
-        #[cfg(unix)]
         assert_eq!(filename, String::from("activity-insights"));
 
-        #[cfg(not(unix))]
+        use std::fs::Permissions;
+        use std::os::unix::fs::PermissionsExt;
+
+        let file = fs::File::open(new_binary).unwrap();
+        let permissions = file.metadata().unwrap().permissions();
+
+        // The first few bits represent data about the file, which is why its 0o100777 and not
+        // 0o777
+        let expected_permissions = Permissions::from_mode(0o100777);
+        assert_eq!(permissions, expected_permissions);
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn updating() {
+        let fake_dir = tempfile::tempdir().unwrap();
+        fs::File::create(fake_dir.path().join("activity-insights.exe")).unwrap();
+        update_cli(fake_dir.path(), FAKE_VERSION).unwrap();
+
+        let mut entries: Vec<_> = fs::read_dir(fake_dir.path())
+            .unwrap()
+            .map(|x| x.unwrap())
+            .collect();
+
+        assert_eq!(2, entries.len());
+        entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+        let new_binary = entries[0].path();
+        let filename = new_binary.file_name().unwrap().to_str().unwrap();
+
         assert_eq!(filename, String::from("activity-insights.exe"));
 
-        #[cfg(unix)]
-        {
-            use std::fs::Permissions;
-            use std::os::unix::fs::PermissionsExt;
+        let old_binary = entries[1].path();
+        let filename = old_binary.file_name().unwrap().to_str().unwrap();
 
-            let file = fs::File::open(new_binary).unwrap();
-            let permissions = file.metadata().unwrap().permissions();
-
-            // The first few bits represent data about the file, which is why its 0o100777 and not
-            // 0o777
-            let expected_permissions = Permissions::from_mode(0o100777);
-            assert_eq!(permissions, expected_permissions);
-        }
+        assert_eq!(filename, String::from("old-version"));
     }
 
     #[test]
