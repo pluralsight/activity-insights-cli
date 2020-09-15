@@ -1,0 +1,39 @@
+on:
+  push:
+    paths-ignore:
+      - 'cli-version'
+
+
+name: Test
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+        matrix:
+          include:
+            - os: ubuntu-latest
+
+            - os: macos-latest
+
+            - os: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Version
+        run: echo "::set-env name=CLI_VERSION::$(cat cli-version)"
+
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
