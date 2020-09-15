@@ -1,5 +1,7 @@
 on:
   push:
+    branches: 
+      - master
     paths:
     - 'cli-version'
 
@@ -52,3 +54,4 @@ jobs:
           cp target/release/activity-insights activity-insights-$CLI_VERSION${{ matrix.extension }}
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
         shell: bash
+      
