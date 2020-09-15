@@ -53,5 +53,13 @@ jobs:
         run: |
           cp target/release/activity-insights activity-insights-$CLI_VERSION${{ matrix.extension }}
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
+          aws s3 sync . s3://ps-cdn/learner-workflow/ps-time-test
+          aws s3 sync . s3://ps-cdn/learner-workflow/ps-time-test
         shell: bash
+        env:
+         AWS_REGION: 'us-east-1'
+         S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          
       
