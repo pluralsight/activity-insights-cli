@@ -278,6 +278,7 @@ fn init() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
     use tempfile;
 
     const FAKE_VERSION: usize = 1;
@@ -303,13 +304,21 @@ mod tests {
         use std::fs::Permissions;
         use std::os::unix::fs::PermissionsExt;
 
-        let file = fs::File::open(new_binary).unwrap();
+        let file = fs::File::open(&new_binary).unwrap();
         let permissions = file.metadata().unwrap().permissions();
 
         // The first few bits represent data about the file, which is why its 0o100777 and not
         // 0o777
         let expected_permissions = Permissions::from_mode(0o100777);
         assert_eq!(permissions, expected_permissions);
+
+        let exit_code = Command::new(&new_binary)
+            .args(&["version"])
+            .output()
+            .unwrap()
+            .status;
+
+        assert!(exit_code.success());
     }
 
     #[cfg(not(unix))]
@@ -336,6 +345,14 @@ mod tests {
         let filename = old_binary.file_name().unwrap().to_str().unwrap();
 
         assert_eq!(filename, String::from("old-version"));
+
+        let exit_code = Command::new(&new_binary)
+            .args(&["version"])
+            .output()
+            .unwrap()
+            .status;
+
+        assert!(exit_code.success());
     }
 
     #[test]
