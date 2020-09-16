@@ -317,6 +317,7 @@ mod tests {
             .output()
             .unwrap()
             .status;
+        println!("EXIT CODE: {}", exit_code);
 
         assert!(exit_code.success());
     }
