@@ -319,6 +319,12 @@ mod tests {
             .status;
         println!("EXIT CODE: {}", exit_code);
 
+        let process = Command::new(&new_binary)
+            .args(&["version"])
+            .output()
+            .unwrap();
+        println!("PROCESS: {:?}", process);
+
         assert!(exit_code.success());
     }
 
