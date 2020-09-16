@@ -25,7 +25,6 @@ jobs:
 
       - name: Log Glibc version
         run: |
-          aptitude show libc6
           ldd --version
 
       - name: Install Rust Toolchain
