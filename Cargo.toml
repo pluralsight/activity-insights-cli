@@ -29,6 +29,7 @@ uuid = { version = "0.8.1", features = ["serde", "v4"] }
 assert_cmd = "1.0.1"
 ctor = "0.1.15"
 env_logger = "0.7.1"
+predicates = "1.0.5"
 
 [[bin]]
 name = "activity-insights"
