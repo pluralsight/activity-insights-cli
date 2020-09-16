@@ -24,8 +24,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Log Glibc version
-        run: aptitude show libc6
-        run: ldd --version
+        run: |
+          aptitude show libc6
+          ldd --version
 
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
