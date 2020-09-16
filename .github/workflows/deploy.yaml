@@ -15,12 +15,15 @@ jobs:
           include:
             - os: ubuntu-latest
               extension: ""
+              filepath: "ubuntu"
 
             - os: macos-latest
               extension: ""
+              filepath: "mac"
 
             - os: windows-latest
               extension: ".exe"
+              filepath: "windows"
 
     steps:
       - name: Checkout
@@ -53,8 +56,7 @@ jobs:
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
           pwd
           ls -al
-          aws s3 sync activity-insights-latest${{ matrix.extension }} s3://ps-cdn/learner-workflow/ps-time-test
-          aws s3 sync activity-insights-latest${{ matrix.extension }} s3://ps-cdn/learner-workflow/ps-time-test
+          aws s3 sync . s3://ps-cdn/learner-workflow/ps-time-test/${{ matrix.filepath }} --exclude="*" --include="activity-insights-$CLI_VERSION${{ matrix.extension }}"
         shell: bash
         env:
          AWS_REGION: 'us-west-2'
