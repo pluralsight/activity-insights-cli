@@ -311,21 +311,6 @@ mod tests {
         // 0o777
         let expected_permissions = Permissions::from_mode(0o100777);
         assert_eq!(permissions, expected_permissions);
-
-        let exit_code = Command::new(&new_binary)
-            .args(&["version"])
-            .output()
-            .unwrap()
-            .status;
-        println!("EXIT CODE: {}", exit_code);
-
-        let process = Command::new(&new_binary)
-            .args(&["version"])
-            .output()
-            .unwrap();
-        println!("PROCESS: {:?}", process);
-
-        assert!(exit_code.success());
     }
 
     #[cfg(not(unix))]
@@ -352,14 +337,6 @@ mod tests {
         let filename = old_binary.file_name().unwrap().to_str().unwrap();
 
         assert_eq!(filename, String::from("old-version"));
-
-        let exit_code = Command::new(&new_binary)
-            .args(&["version"])
-            .output()
-            .unwrap()
-            .status;
-
-        assert!(exit_code.success());
     }
 
     #[test]
