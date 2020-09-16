@@ -23,10 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Log Glibc version
-        run: |
-          ldd --version
-
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
