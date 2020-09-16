@@ -1,7 +1,10 @@
 on:
   push:
-    paths-ignore:
+    paths:
       - 'cli-version'
+
+    branches:
+        - 'master'
 
 
 name: Deploy to s3
