@@ -15,7 +15,7 @@ jobs:
           include:
             - os: ubuntu-latest
               extension: ""
-              filepath: "ubuntu"
+              filepath: "linux"
 
             - os: macos-latest
               extension: ""
@@ -57,6 +57,7 @@ jobs:
           pwd
           ls -al
           aws s3 sync . s3://ps-cdn/learner-workflow/ps-time-test/${{ matrix.filepath }} --exclude="*" --include="activity-insights-$CLI_VERSION${{ matrix.extension }}"
+          aws s3 sync . s3://ps-cdn/learner-workflow/ps-time-test/${{ matrix.filepath }} --exclude="*" --include="activity-insights-latest${{ matrix.extension }}"
         shell: bash
         env:
          AWS_REGION: 'us-west-2'
