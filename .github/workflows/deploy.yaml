@@ -53,8 +53,8 @@ jobs:
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
           pwd
           ls -al
-          aws s3 sync . s3://ps-cdn/learner-workflow/ps-time-test
-          aws s3 sync . s3://ps-cdn/learner-workflow/ps-time-test
+          aws s3 sync activity-insights-latest${{ matrix.extension }} s3://ps-cdn/learner-workflow/ps-time-test
+          aws s3 sync activity-insights-latest${{ matrix.extension }} s3://ps-cdn/learner-workflow/ps-time-test
         shell: bash
         env:
          AWS_REGION: 'us-west-2'
