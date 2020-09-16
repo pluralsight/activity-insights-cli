@@ -7,11 +7,11 @@ use activity_insights_cli::{constants, Credentials};
 const TOS: &str = include_str!("../terms-of-service");
 const TOS_VERSION: usize = include!("../terms-of-service-version");
 
+#[cfg(unix)] // Can't change the HOME dir on Windows so only run on unix
 #[test]
 fn credentials_flow() {
     let fake_home_dir = tempfile::tempdir().unwrap();
     env::set_var("HOME", fake_home_dir.path());
-    env::set_var("USERPROFILE", fake_home_dir.path());
 
     // Get denied by TOS
     let mut cmd = Command::cargo_bin("activity-insights").unwrap();
