@@ -1,6 +1,6 @@
 on:
   push:
-    paths:
+    paths-ignore:
       - 'cli-version'
 
 
