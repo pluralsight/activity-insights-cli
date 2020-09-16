@@ -11,6 +11,7 @@ const TOS_VERSION: usize = include!("../terms-of-service-version");
 fn credentials_flow() {
     let fake_home_dir = tempfile::tempdir().unwrap();
     env::set_var("HOME", fake_home_dir.path());
+    env::set_var("USERPROFILE", fake_home_dir.path());
 
     // Get denied by TOS
     let mut cmd = Command::cargo_bin("activity-insights").unwrap();
