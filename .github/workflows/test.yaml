@@ -23,8 +23,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Set Version
-        run: echo "::set-env name=CLI_VERSION::$(cat cli-version)"
+      - name: Log Glibc version
+        run: aptitude show libc6
+        run: ldd --version
 
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
