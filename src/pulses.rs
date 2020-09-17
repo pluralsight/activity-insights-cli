@@ -10,6 +10,8 @@ use std::fs;
 use std::{convert::TryFrom, path::PathBuf};
 use thiserror::Error;
 
+use crate::constants;
+
 /// event_date is milliseconds seconds since the Unix epoch
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +32,7 @@ pub struct Pulse {
     programming_language: String,
     editor: String,
     tags: HashSet<&'static str>,
+    cli_version: usize,
 }
 
 #[derive(Debug, Error)]
@@ -70,6 +73,7 @@ impl TryFrom<PulseFromEditor> for Pulse {
             editor: editor_pulse.editor,
             programming_language: String::from(language),
             tags,
+            cli_version: constants::VERSION,
         })
     }
 }
@@ -116,6 +120,7 @@ mod tests {
             programming_language: String::from("Other"),
             editor: String::from("emacs :rip:"),
             tags,
+            cli_version: constants::VERSION,
         };
         assert_eq!(pulse, expected);
     }
