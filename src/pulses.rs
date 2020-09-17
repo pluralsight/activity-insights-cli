@@ -32,6 +32,7 @@ pub struct Pulse {
     programming_language: String,
     editor: String,
     tags: HashSet<&'static str>,
+    #[serde(rename(serialize = "cliVersion"))]
     cli_version: usize,
 }
 
