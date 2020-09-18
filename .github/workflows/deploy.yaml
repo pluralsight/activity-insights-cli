@@ -53,6 +53,9 @@ jobs:
           command: run
           args: --bin codegen
 
+      - name: Statically Link PCRE2
+        run: export PCRE2_SYS_STATIC=1
+
       - name: Build
         uses: actions-rs/cargo@v1
         with:
