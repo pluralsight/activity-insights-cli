@@ -47,6 +47,12 @@ jobs:
         with:
           command: test
 
+      - name: Update library list
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --bin codegen
+
       - name: Build
         uses: actions-rs/cargo@v1
         with:
