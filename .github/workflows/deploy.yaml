@@ -55,6 +55,7 @@ jobs:
 
       - name: Statically Link PCRE2
         run: export PCRE2_SYS_STATIC=1
+        shell: bash
 
       - name: Build
         uses: actions-rs/cargo@v1
