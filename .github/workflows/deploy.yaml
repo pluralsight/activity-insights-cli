@@ -32,8 +32,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Set Version
+      - name: Set Env Vars
         run: echo "::set-env name=CLI_VERSION::$(cat cli-version)"
+        run: echo "::set-env name=PCRE2_SYS_STATIC::1"
 
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
@@ -53,10 +54,6 @@ jobs:
           command: run
           args: --bin codegen
 
-      - name: Statically Link PCRE2
-        run: export PCRE2_SYS_STATIC=1
-        shell: bash
-
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -67,11 +64,12 @@ jobs:
         run: |
           cp target/release/activity-insights activity-insights-$CLI_VERSION${{ matrix.extension }}
           cp target/release/activity-insights activity-insights-latest${{ matrix.extension }}
-          pwd
-          ls -al
+
+      - name: Deploy
+        shell: bash
+        run: |
           aws s3 sync . s3://ps-cdn/learner-workflow/ps-time/${{ matrix.filepath }} --exclude="*" --include="activity-insights-$CLI_VERSION${{ matrix.extension }}"
           aws s3 sync . s3://ps-cdn/learner-workflow/ps-time/${{ matrix.filepath }} --exclude="*" --include="activity-insights-latest${{ matrix.extension }}"
-        shell: bash
         env:
          AWS_REGION: 'us-west-2'
          S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
