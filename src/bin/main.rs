@@ -19,7 +19,8 @@ use std::{
 };
 
 use activity_insights_cli::{
-    build_pulses, constants, maybe_update, open_browser, register, send_pulses, Credentials,
+    build_pulses, constants, get_libraries, maybe_update, open_browser, register, send_pulses,
+    Credentials,
 };
 
 fn main() {
@@ -29,6 +30,7 @@ fn main() {
     match env::args().nth(1) {
         Some(v) if v.as_str() == "accept_tos" => accept_tos_command(),
         Some(v) if v.as_str() == "version" => println!("{}", constants::VERSION),
+        Some(v) if v.as_str() == "libraries" => get_libraries_command(),
         _ => {
             check_tos();
             match env::args().nth(1) {
@@ -158,6 +160,19 @@ fn accept_tos_command() {
             error!("Error accepting TOS {}: {}", constants::TOS_VERSION, e);
             exit(102)
         });
+}
+
+fn get_libraries_command() {
+    let content = match read_from_stdin_with_timeout(Duration::from_millis(10_000)) {
+        Ok(input) => input,
+        Err(e) => {
+            error!("Timedout reading from stdin: {}", e);
+            exit(50);
+        }
+    };
+
+    let libraries = get_libraries(&content);
+    libraries.iter().for_each(|library| println!("{}", library));
 }
 
 /*

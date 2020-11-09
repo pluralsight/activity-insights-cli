@@ -5,6 +5,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     convert::TryFrom,
     fs,
     io::{self, BufWriter, Write},
@@ -13,6 +14,12 @@ use std::{
 };
 use tempfile::NamedTempFile;
 use thiserror::Error;
+
+use polyglot_tokenizer::{Token, Tokenizer};
+
+// Include a phf set of common package names to match against
+// static PACKAGES: phf::Set<&'static str> = ...;
+include!("./codegen/packages-set.rs");
 
 pub mod constants;
 mod credentials;
@@ -163,6 +170,16 @@ pub fn get_latest_version() -> Result<usize, ActivityInsightsError> {
     let resp: VersionResponse = serde_json::from_reader(resp)?;
 
     Ok(resp.version)
+}
+
+pub fn get_libraries(content: &str) -> HashSet<&'static str> {
+    Tokenizer::new(&content)
+        .tokens()
+        .filter_map(|token| match token {
+            Token::String(_, value, _) | Token::Ident(value) => PACKAGES.get_key(value).copied(),
+            _ => None,
+        })
+        .collect()
 }
 
 pub fn update_cli(path: &Path, version: usize) -> Result<(), ActivityInsightsError> {

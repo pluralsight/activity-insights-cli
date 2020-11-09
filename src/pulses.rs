@@ -1,9 +1,4 @@
-// Include a phf set of common package names to match against
-// static PACKAGES: phf::Set<&'static str> = ...;
-include!("./codegen/packages-set.rs");
-
 use chrono::{TimeZone, Utc};
-use polyglot_tokenizer::{Token, Tokenizer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -58,15 +53,7 @@ impl TryFrom<PulseFromEditor> for Pulse {
             .unwrap_or("Other");
 
         let content = fs::read_to_string(&editor_pulse.file_path).unwrap_or_default();
-        let tags: HashSet<&'static str> = Tokenizer::new(&content)
-            .tokens()
-            .filter_map(|token| match token {
-                Token::String(_, value, _) | Token::Ident(value) => {
-                    PACKAGES.get_key(value).copied()
-                }
-                _ => None,
-            })
-            .collect();
+        let tags = super::get_libraries(&content);
 
         Ok(Pulse {
             pulse_type: editor_pulse.event_type,
@@ -91,7 +78,6 @@ fn breakdown_milliseconds(ms: i64) -> (i64, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
