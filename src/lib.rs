@@ -108,7 +108,7 @@ pub fn send_pulses(pulses: &[Pulse]) -> Result<StatusCode, ActivityInsightsError
 
 // Don't send the pulses for the tests
 #[cfg(test)]
-pub fn send_pulses(pulses: &Vec<Pulse>) -> Result<StatusCode, ActivityInsightsError> {
+pub fn send_pulses(pulses: &[Pulse]) -> Result<StatusCode, ActivityInsightsError> {
     // loggging out unused variables here to avoid unused warning
     log::info!(
         "{:?}, {} {:?}",
@@ -224,10 +224,7 @@ pub fn update_cli(path: &Path, version: usize) -> Result<(), ActivityInsightsErr
     }
 
     if let Err(e) = fs::rename(&ephemeral_update_file, &permanent_executable_path) {
-        return Err(ActivityInsightsError::IO(
-            permanent_executable_path.clone(),
-            e,
-        ));
+        return Err(ActivityInsightsError::IO(permanent_executable_path, e));
     }
 
     #[cfg(unix)]
@@ -296,7 +293,6 @@ fn init() {
 mod tests {
     use super::*;
     use std::process::Command;
-    use tempfile;
 
     const FAKE_VERSION: usize = 2;
 

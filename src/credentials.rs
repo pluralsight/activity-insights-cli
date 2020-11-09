@@ -214,7 +214,7 @@ mod tests {
                 #[cfg(not(unix))]
                 assert_eq!(e.kind(), std::io::ErrorKind::Other);
             }
-            _ => assert!(false),
+            _ => panic!("Fail test. Should've received an error"),
         }
     }
 
