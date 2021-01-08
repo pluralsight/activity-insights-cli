@@ -1,10 +1,11 @@
 on:
+  workflow_dispatch
   push:
     paths:
       - 'cli-version'
 
     branches:
-        - 'master'
+      - 'master'
 
 
 name: Deploy to s3
