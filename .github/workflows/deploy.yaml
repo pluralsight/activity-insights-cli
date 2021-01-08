@@ -34,8 +34,8 @@ jobs:
 
       - name: Set Env Vars
         run: |
-          echo "::set-env name=CLI_VERSION::$(cat cli-version)"
-          echo "::set-env name=PCRE2_SYS_STATIC::1"
+          echo "CLI_VERSION=$(cat cli-version)" >> $GITHUB_ENV
+          echo "PCRE2_SYS_STATIC=1" >> $GITHUB_ENV
 
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
